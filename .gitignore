@@ -29,9 +29,11 @@ __pycache__/
 *.fls
 *.fdb_latexmk
 
-
 # Sandbox directories
 **/sandbox
 
 # Experiment outputs
 **/experiment_outputs
+
+# Python environment
+.python-version
