@@ -1,0 +1,14 @@
+[project]
+name = "rkhs-shap"
+version = "0.1.0"
+description = "RKHS-SHAP: Shapley Values for Kernel Methods"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "gpytorch>=1.14",
+    "numpy>=2.3.2",
+    "scikit-learn>=1.7.1",
+    "scipy>=1.16.1",
+    "tqdm>=4.67.1",
+]
