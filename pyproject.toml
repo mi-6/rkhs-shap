@@ -13,3 +13,8 @@ dependencies = [
     "shap>=0.49.1",
     "tqdm>=4.67.1",
 ]
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.10.7",
+]
