@@ -184,30 +184,17 @@ wheels = [
 
 [[package]]
 name = "gpytorch"
-version = "1.14"
+version = "1.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "jaxtyping" },
-    { name = "linear-operator" },
-    { name = "mpmath" },
+    { name = "numpy" },
     { name = "scikit-learn" },
     { name = "scipy" },
+    { name = "torch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7a/70/7e925758468f924ffc6da9f6007b1d92e37455212d451c6c771cfa1c37fd/gpytorch-1.14.tar.gz", hash = "sha256:032cc11e6a46e1e4bc7763fcef318cc830aceaea85a7289f27b2288c7a339a8d", size = 2472710, upload-time = "2025-01-29T16:03:36.926Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/56/7ab70f571a2bde66dfc6218c93d367bca42477545ed73e2a66226ad78ecc/gpytorch-1.8.1.tar.gz", hash = "sha256:fe8e412a73a2b07027e30c65c61323de15ebcef439f5bd21200cf26551fd0e30", size = 251780, upload-time = "2022-08-08T21:28:55.158Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0e/58/ac756b7c9b7daec0382d7c8e0b2c70819df227826edd8aa5bce115470d5a/gpytorch-1.14-py3-none-any.whl", hash = "sha256:9b17ff7bd70dc39c3a3c03eb2bb9a87aa4b840c26e71ac68d120b96487bf5a12", size = 277740, upload-time = "2025-01-29T16:03:32.334Z" },
-]
-
-[[package]]
-name = "jaxtyping"
-version = "0.3.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "wadler-lindig" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/88/a8/416bd7ea110ec6b68e8868b0f99c985c735adcf7badc491d3c343937260a/jaxtyping-0.3.2.tar.gz", hash = "sha256:f30483fac4b42e915db8ad2414a85c3b63284aa7d3c100b96b59f755cf4a86ad", size = 44989, upload-time = "2025-04-23T09:48:16.907Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/b9/281e10e2d967ea5e481683eaec99f55ac5a61085ee60551c36942ef32bef/jaxtyping-0.3.2-py3-none-any.whl", hash = "sha256:6a020fd276226ddb5ac4f5725323843dd65e3c7e85c64fd62431e5f738c74e04", size = 55409, upload-time = "2025-04-23T09:48:15.924Z" },
+    { url = "https://files.pythonhosted.org/packages/67/30/80921ea672e94f2fd17f92161d82749c86e7aa909c2717e6615434193c86/gpytorch-1.8.1-py2.py3-none-any.whl", hash = "sha256:74f51469175fc9e52c86e0f2a5524605439ce307393e5d0bf3a9dc78cfef3244", size = 361830, upload-time = "2022-08-08T21:28:52.931Z" },
 ]
 
 [[package]]
@@ -319,21 +306,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/33/01/a8ea7c5ea32a9b45ceeaee051a04c8ed4320f5add3c51bfa20879b765b70/kiwisolver-1.4.9-pp311-pypy311_pp73-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:85b5352f94e490c028926ea567fc569c52ec79ce131dadb968d3853e809518c2", size = 80281, upload-time = "2025-08-10T21:27:45.369Z" },
     { url = "https://files.pythonhosted.org/packages/da/e3/dbd2ecdce306f1d07a1aaf324817ee993aab7aee9db47ceac757deabafbe/kiwisolver-1.4.9-pp311-pypy311_pp73-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:464415881e4801295659462c49461a24fb107c140de781d55518c4b80cb6790f", size = 78009, upload-time = "2025-08-10T21:27:46.376Z" },
     { url = "https://files.pythonhosted.org/packages/da/e9/0d4add7873a73e462aeb45c036a2dead2562b825aa46ba326727b3f31016/kiwisolver-1.4.9-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:fb940820c63a9590d31d88b815e7a3aa5915cad3ce735ab45f0c730b39547de1", size = 73929, upload-time = "2025-08-10T21:27:48.236Z" },
-]
-
-[[package]]
-name = "linear-operator"
-version = "0.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jaxtyping" },
-    { name = "mpmath" },
-    { name = "scipy" },
-    { name = "torch" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/e9/c900e42b989e5778d0a28bb28aa63a5cef4f7e2f1af34b9de6157da77913/linear_operator-0.6.tar.gz", hash = "sha256:a9e2663879f1a2b28631bf7ef34892c4e5749893e711c8ef0ab0a39aff70a654", size = 185103, upload-time = "2025-01-28T23:13:58.745Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/c7/8a27fd8e182c611d4bf0aa9f0ea9046a7c843901d0f06c8cdcb599840a38/linear_operator-0.6-py3-none-any.whl", hash = "sha256:b7c30ce0f6599e19c1cb970e00811828df98783b20c1dd2f765928415012f41c", size = 176344, upload-time = "2025-01-28T23:13:56.666Z" },
 ]
 
 [[package]]
@@ -923,7 +895,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "gpytorch", specifier = ">=1.14" },
+    { name = "gpytorch", specifier = "<1.9" },
     { name = "numpy", specifier = ">=2.3.2" },
     { name = "scikit-learn", specifier = ">=1.7.1" },
     { name = "scipy", specifier = ">=1.16.1" },
@@ -1208,13 +1180,4 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/95/32/1a225d6164441be760d75c2c42e2780dc0873fe382da3e98a2e1e48361e5/tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9", size = 196380, upload-time = "2025-03-23T13:54:43.652Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/23/c7abc0ca0a1526a0774eca151daeb8de62ec457e77262b66b359c3c7679e/tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8", size = 347839, upload-time = "2025-03-23T13:54:41.845Z" },
-]
-
-[[package]]
-name = "wadler-lindig"
-version = "0.1.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1e/67/cbae4bf7683a64755c2c1778c418fea96d00e34395bb91743f08bd951571/wadler_lindig-0.1.7.tar.gz", hash = "sha256:81d14d3fe77d441acf3ebd7f4aefac20c74128bf460e84b512806dccf7b2cd55", size = 15842, upload-time = "2025-06-18T07:00:42.843Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/96/04e7b441807b26b794da5b11e59ed7f83b2cf8af202bd7eba8ad2fa6046e/wadler_lindig-0.1.7-py3-none-any.whl", hash = "sha256:e3ec83835570fd0a9509f969162aeb9c65618f998b1f42918cfc8d45122fe953", size = 20516, upload-time = "2025-06-18T07:00:41.684Z" },
 ]
