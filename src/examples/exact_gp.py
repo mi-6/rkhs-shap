@@ -1,6 +1,7 @@
 import gpytorch
 import torch
 from typing import Optional
+import numpy as np
 
 
 class ExactGPModel(gpytorch.models.ExactGP):
@@ -32,6 +33,11 @@ class ExactGPModel(gpytorch.models.ExactGP):
         with torch.no_grad():
             return self.likelihood(self(x))
 
+    def predict_mean_numpy(self, x: np.ndarray) -> np.ndarray:
+        x_tensor = torch.tensor(x)
+        posterior = self.predict(x_tensor)
+        return posterior.mean.numpy()
+
     def fit(self, training_iter: int = 50, lr: float = 0.1) -> None:
         train_x = self.train_inputs[0]
         train_y = self.train_targets
@@ -62,6 +68,10 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
         self.eval()
         self.likelihood.eval()
+
+    @property
+    def lengthscale(self) -> torch.Tensor:
+        return self.covar_module.lengthscale
 
 
 if __name__ == "__main__":
