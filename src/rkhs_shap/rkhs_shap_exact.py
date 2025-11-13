@@ -16,6 +16,7 @@ from rkhs_shap.sampling import (
     generate_full_Z,
     subsetting_full_Z,
 )
+from rkhs_shap.subset_kernel import SubsetKernel
 
 
 class RKHSSHAP(object):
@@ -70,24 +71,16 @@ class RKHSSHAP(object):
         self.ypred = Kxx @ alphas
         self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2)
 
-    def _create_subkernel(self, active_dims: list[int]) -> RBFKernel:
-        """Create a sub-kernel with specified active dimensions.
+    def _create_subkernel(self, subset_dims: list[int]) -> SubsetKernel:
+        """Create a sub-kernel with specified subset dimensions.
 
         Args:
-            active_dims: List of dimension indices to include in the sub-kernel
+            subset_dims: List of dimension indices to include in the sub-kernel
 
         Returns:
-            RBFKernel configured for the active dimensions with appropriate lengthscales
+            SubsetKernel that restricts evaluation to the specified dimensions
         """
-        if hasattr(self.k, 'ard_num_dims') and self.k.ard_num_dims is not None:
-            k_sub = RBFKernel(ard_num_dims=len(active_dims), active_dims=active_dims)
-            k_sub.lengthscale = self.k.lengthscale[:, active_dims]
-        else:
-            k_sub = RBFKernel(active_dims=active_dims)
-            k_sub.lengthscale = self.k.lengthscale
-
-        k_sub.raw_lengthscale.requires_grad = False
-        return k_sub
+        return SubsetKernel(self.k, subset_dims=subset_dims)
 
     def _value_intervention(self, z, X_new):
 

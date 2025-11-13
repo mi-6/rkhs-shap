@@ -63,7 +63,7 @@ class SubsetKernel(Kernel):
             return
 
         lengthscale = kernel.lengthscale
-        lengthscale_subset = lengthscale[..., self.subset_dims].clone()
+        lengthscale_subset = lengthscale[..., self.subset_dims]
 
         if hasattr(kernel, "ard_num_dims"):
             kernel.ard_num_dims = len(self.subset_dims)
