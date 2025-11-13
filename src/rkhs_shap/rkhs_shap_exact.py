@@ -11,7 +11,7 @@ from gpytorch.kernels import RBFKernel
 from sklearn.linear_model import Ridge
 from numpy import sum
 from tqdm import tqdm
-from src.sampling import (
+from rkhs_shap.sampling import (
     large_scale_sample_alternative,
     generate_full_Z,
     subsetting_full_Z,

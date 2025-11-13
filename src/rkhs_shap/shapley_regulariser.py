@@ -9,8 +9,8 @@ import numpy as np
 from gpytorch.kernels import RBFKernel
 from gpytorch.lazy import lazify
 from tqdm import tqdm
-from src.sampling import large_scale_sample_alternative, generate_full_Z, subsetting_full_Z
-from src.kernel_approx import Nystroem_gpytorch
+from rkhs_shap.sampling import large_scale_sample_alternative, generate_full_Z, subsetting_full_Z
+from rkhs_shap.kernel_approx import Nystroem_gpytorch
 
 
 def insert_i(ls, feature_to_exclude):

@@ -12,8 +12,8 @@ from numpy import sum
 
 from tqdm import tqdm
 
-from src.sampling import large_scale_sample_alternative, generate_full_Z, subsetting_full_Z
-from src.kernel_approx import Nystroem_gpytorch
+from rkhs_shap.sampling import large_scale_sample_alternative, generate_full_Z, subsetting_full_Z
+from rkhs_shap.kernel_approx import Nystroem_gpytorch
 
 
 class RKHSSHAP_Approx(object):
@@ -24,10 +24,10 @@ class RKHSSHAP_Approx(object):
     def __init__(self,
                  X: np.array,
                  y: np.array,
-                 lambda_krr: np.float = 1e-2,
-                 lambda_cme: np.float = 1e-3,
+                 lambda_krr: float = 1e-2,
+                 lambda_cme: float = 1e-3,
                  lengthscale: np.array = None,
-                 n_components: np.int = 100
+                 n_components: int = 100
                  ):
 
         """[summary]
@@ -35,10 +35,10 @@ class RKHSSHAP_Approx(object):
         Args:
             X (np.array): [training instances]
             y (np.array): [training label]
-            lambda_krr (np.float, optional): [regularisation for kernel ridge regression]. Defaults to 1e-2.
-            lambda_cme (np.float, optional): [regularisation for conditional mean embedding]. Defaults to 1e-3.
+            lambda_krr (float, optional): [regularisation for kernel ridge regression]. Defaults to 1e-2.
+            lambda_cme (float, optional): [regularisation for conditional mean embedding]. Defaults to 1e-3.
             lengthscale (np.array, optional): [lengthscale for kernel]. Defaults to None.
-            n_components (np.int, optional): [number of landmark points for kernel approximation]. Defaults to 100.
+            n_components (int, optional): [number of landmark points for kernel approximation]. Defaults to 100.
 
         """
 

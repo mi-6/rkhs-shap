@@ -9,8 +9,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pylab as plt
 import torch
-from src.shapley_regulariser import ShapleyRegulariser
-from src.rkhs_shap_approx import RKHSSHAP_Approx
+from rkhs_shap.shapley_regulariser import ShapleyRegulariser
+from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
 from experiments.Regularisation.correlated_linear_model import CorrelatedLinearModel
 from sklearn.metrics import pairwise_distances
 import copy

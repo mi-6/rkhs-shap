@@ -11,7 +11,7 @@ from experiments.BananaShapley.banana_distribution import Banana2d
 
 warnings.filterwarnings("ignore")
 from experiments.BananaShapley.gshap_banana import Observation2dBanana
-from src.rkhs_shap_exact import RKHSSHAP as RKHS_SHAP
+from rkhs_shap.rkhs_shap_exact import RKHSSHAP as RKHS_SHAP
 from sklearn.metrics import pairwise_distances
 
 

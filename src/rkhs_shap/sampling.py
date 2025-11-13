@@ -5,11 +5,11 @@ import numpy as np
 """[summary]: This file contains code for sampling coalitions to run the weighed least square approach in RKHS-SHAP."""
 
 
-def generate_full_Z(m: np.int):
+def generate_full_Z(m: int):
     """[Generate the 2^m possible ordering of the binary matrix]
 
     Args:
-        m (np.int): [Number of features]
+        m (int): [Number of features]
 
     Returns:
         [ls]: [ls of binary orderings]
@@ -113,13 +113,13 @@ def propose_func(z):
     z[index] = -z[index]
     return z
 
-def generate_samples_Z(m: np.int, mcmc_run: np.int, warm_up_cut: np.int):
+def generate_samples_Z(m: int, mcmc_run: int, warm_up_cut: int):
     """[Generate Samples of zs' for the KS4K]
 
     Args:
-        m (np.int): [number of features]
-        mcmc_run (np.int): [number of MCMC runs]
-        warm_up_cut (np.int): [number of warmup to discard (initial runs not converging to stationary dist)]]
+        m (int): [number of features]
+        mcmc_run (int): [number of MCMC runs]
+        warm_up_cut (int): [number of warmup to discard (initial runs not converging to stationary dist)]]
 
     Returns:
         [Z](np.array/np.matrix idk): [sampels of zs' for KS4K returned as the Z matrix in KernelSHAP]
@@ -139,7 +139,7 @@ def generate_samples_Z(m: np.int, mcmc_run: np.int, warm_up_cut: np.int):
             continue 
         else:
             # the alpha score in MCMC
-            a_t = np.min([1, weights(np.int(propose_s), np.int(m))/ weights(np.int(current_s), np.int(m))])
+            a_t = np.min([1, weights(int(propose_s), int(m))/ weights(int(current_s), int(m))])
 
             flip = np.random.uniform()
 

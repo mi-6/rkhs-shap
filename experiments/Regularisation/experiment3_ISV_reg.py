@@ -7,9 +7,9 @@ sys.path.append(base_dir)
 
 import numpy as np
 
-from src.shapley_regulariser import ShapleyRegulariser
-from src.rkhs_shap_approx import RKHSSHAP_Approx
-from src.kernel_ridge_regression import KernelRidgeRegressor
+from rkhs_shap.shapley_regulariser import ShapleyRegulariser
+from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
+from rkhs_shap.kernel_ridge_regression import KernelRidgeRegressor
 from experiments.Regularisation.correlated_linear_model import CorrelatedLinearModel
 
 from sklearn.model_selection import train_test_split
