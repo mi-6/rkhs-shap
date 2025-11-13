@@ -165,13 +165,13 @@ def test_exact_rkhs_shap_diabetes(trained_model):
     assert shap_values_O.shape == (n_explain, X_train.shape[1])
 
     # 2. Additivity error should be reasonably small (within 10% of prediction range)
-    assert additivity_mae_I < 0.02, f"Interventional additivity error too large: {additivity_mae_I}"
-    assert additivity_mae_O < 0.02, f"Observational additivity error too large: {additivity_mae_O}"
+    assert additivity_mae_I < 0.005, f"Interventional additivity error too large: {additivity_mae_I}"
+    assert additivity_mae_O < 0.005, f"Observational additivity error too large: {additivity_mae_O}"
 
     # 3. Correlation with KernelSHAP should be high
     assert mean_corr_I > 0.99, \
         f"Interventional correlation with KernelSHAP too low: {mean_corr_I}"
-    assert mean_corr_O > 0.8, \
+    assert mean_corr_O > 0.85, \
         f"Observational correlation with KernelSHAP too low: {mean_corr_O}"
 
     print("\n" + "="*60)

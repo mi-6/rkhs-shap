@@ -38,17 +38,13 @@ class RKHSSHAP(object):
                 in Gaussian Process formulation. If you've fit a GP model, set this to
                 model.likelihood.noise_covar.noise for equivalent predictions.
             lambda_cme: Regularization for conditional/marginal mean embeddings
-            lengthscale: Optional lengthscale for RBF kernel. If provided, features
-                are scaled by 1/lengthscale before kernel computation.
+            lengthscale: Optional lengthscale parameter for the RBF kernel. If provided,
+                the kernel's lengthscale will be set to this value.
         """
 
         # Store data
         self.n, self.m = X.shape
-        self.X, self.y = X, y
-        self.X_scaled = (
-            (X / lengthscale).float() if lengthscale is not None else X.float()
-        )
-        self.lengthscale = lengthscale
+        self.X, self.y = X.float(), y
 
         lambda_krr = torch.tensor(lambda_krr, dtype=torch.float32)
         lambda_cme = torch.tensor(lambda_cme, dtype=torch.float32)
@@ -56,22 +52,44 @@ class RKHSSHAP(object):
         self.lambda_cme = lambda_cme
 
         # Set up kernel
-        rbf = RBFKernel()
+        if lengthscale is not None and lengthscale.numel() > 1:
+            rbf = RBFKernel(ard_num_dims=self.m)
+            rbf.lengthscale = lengthscale
+        else:
+            rbf = RBFKernel()
+            if lengthscale is not None:
+                rbf.lengthscale = lengthscale
         rbf.raw_lengthscale.requires_grad = False
         self.k = rbf
-        self.kernel_type = type(rbf)
 
         # Run Kernel Ridge Regression (need alphas!)
-        Kxx = rbf(self.X_scaled)
+        Kxx = rbf(self.X)
         alphas = Kxx.add_diag(lambda_krr).inv_matmul(self.y)
         self.alphas = alphas.float().reshape(-1, 1)
 
         self.ypred = Kxx @ alphas
         self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2)
 
-    def _value_intervention(self, z, X_new):
+    def _create_subkernel(self, active_dims: list[int]) -> RBFKernel:
+        """Create a sub-kernel with specified active dimensions.
 
-        X_new_scaled = X_new / self.lengthscale
+        Args:
+            active_dims: List of dimension indices to include in the sub-kernel
+
+        Returns:
+            RBFKernel configured for the active dimensions with appropriate lengthscales
+        """
+        if hasattr(self.k, 'ard_num_dims') and self.k.ard_num_dims is not None:
+            k_sub = RBFKernel(ard_num_dims=len(active_dims), active_dims=active_dims)
+            k_sub.lengthscale = self.k.lengthscale[:, active_dims]
+        else:
+            k_sub = RBFKernel(active_dims=active_dims)
+            k_sub.lengthscale = self.k.lengthscale
+
+        k_sub.raw_lengthscale.requires_grad = False
+        return k_sub
+
+    def _value_intervention(self, z, X_new):
 
         n_ = X_new.shape[0]
         zc = z == False
@@ -80,7 +98,7 @@ class RKHSSHAP(object):
         self.reference = reference
 
         if z.sum() == self.m:
-            new_ypred = self.alphas.T @ self.k(self.X_scaled, X_new_scaled).evaluate()
+            new_ypred = self.alphas.T @ self.k(self.X, X_new).evaluate()
             return new_ypred - reference
 
         elif z.sum() == 0:
@@ -93,13 +111,11 @@ class RKHSSHAP(object):
             active_S = torch.where(z_tensor)[0].tolist()
             active_Sc = torch.where(zc_tensor)[0].tolist()
 
-            k_S = self.kernel_type(active_dims=active_S)
-            k_Sc = self.kernel_type(active_dims=active_Sc)
-            k_S.raw_lengthscale.requires_grad = False
-            k_Sc.raw_lengthscale.requires_grad = False
+            k_S = self._create_subkernel(active_S)
+            k_Sc = self._create_subkernel(active_Sc)
 
-            K_SSp = k_S(self.X_scaled, X_new_scaled).evaluate().float()
-            K_Sc = k_Sc(self.X_scaled, self.X_scaled)
+            K_SSp = k_S(self.X, X_new).evaluate().float()
+            K_Sc = k_Sc(self.X, self.X)
 
             KME_mat = K_Sc.evaluate().mean(axis=1)[:, np.newaxis] * torch.ones(
                 (self.n, n_)
@@ -109,8 +125,6 @@ class RKHSSHAP(object):
 
     def _value_observation(self, z, X_new):
 
-        X_new_scaled = X_new / self.lengthscale
-
         n_ = X_new.shape[0]
         zc = z == False
 
@@ -118,7 +132,7 @@ class RKHSSHAP(object):
         self.reference = reference
 
         if z.sum() == self.m:
-            new_ypred = self.alphas.T @ self.k(self.X_scaled, X_new_scaled).evaluate()
+            new_ypred = self.alphas.T @ self.k(self.X, X_new).evaluate()
 
             return new_ypred - reference
 
@@ -132,14 +146,12 @@ class RKHSSHAP(object):
             active_S = torch.where(z_tensor)[0].tolist()
             active_Sc = torch.where(zc_tensor)[0].tolist()
 
-            k_S = self.kernel_type(active_dims=active_S)
-            k_Sc = self.kernel_type(active_dims=active_Sc)
-            k_S.raw_lengthscale.requires_grad = False
-            k_Sc.raw_lengthscale.requires_grad = False
+            k_S = self._create_subkernel(active_S)
+            k_Sc = self._create_subkernel(active_Sc)
 
-            K_SSp = k_S(self.X_scaled, X_new_scaled).evaluate().float()
-            K_Sc = k_Sc(self.X_scaled, self.X_scaled)
-            K_SS = k_S(self.X_scaled, self.X_scaled)
+            K_SSp = k_S(self.X, X_new).evaluate().float()
+            K_Sc = k_Sc(self.X, self.X)
+            K_SS = k_S(self.X, self.X)
 
             Xi_S = (
                 K_SS.add_diag(self.n * self.lambda_cme).inv_matmul(K_Sc.evaluate())
