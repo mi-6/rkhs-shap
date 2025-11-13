@@ -6,7 +6,7 @@ import torch
 from scipy.special import binom
 import numpy as np
 from gpytorch.kernels import RBFKernel
-from gpytorch.lazy import lazify
+# from gpytorch.lazy import lazify
 from sklearn.linear_model import Ridge
 from numpy import sum
 from tqdm import tqdm
@@ -19,7 +19,7 @@ class RKHSSHAP(object):
     Implement the exact RKHS SHAP algorithm with no kernel approximation
     """
 
-    def __init__(self, X, y, lambda_krr, lambda_cme, lengthscale):
+    def __init__(self, X, y, lambda_krr = 1e-2, lambda_cme = 1e-4, lengthscale = None,):
         """[summary]
         
         Args:
@@ -36,9 +36,13 @@ class RKHSSHAP(object):
         self.X_scaled = (X/lengthscale).float()
         self.lengthscale = lengthscale
 
-        self.lambda_cme, self.lambda_krr = lambda_cme, lambda_krr
+        lambda_krr = torch.tensor(lambda_krr, dtype=torch.float32)
+        lambda_cme = torch.tensor(lambda_cme, dtype=torch.float32)
+        self.lambda_krr = lambda_krr
+        self.lambda_cme = lambda_cme
 
         # Set up kernel
+        # Initialize RBF kernel without ARD since the algorithm requires passing feature subsets to the kernel
         rbf = RBFKernel()
         rbf.raw_lengthscale.requires_grad = False
         self.k = rbf
