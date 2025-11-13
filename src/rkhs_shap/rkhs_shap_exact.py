@@ -56,10 +56,10 @@ class RKHSSHAP(object):
         self.lambda_cme = lambda_cme
 
         # Set up kernel
-        # Initialize RBF kernel without ARD since the algorithm requires passing feature subsets to the kernel
         rbf = RBFKernel()
         rbf.raw_lengthscale.requires_grad = False
         self.k = rbf
+        self.kernel_type = type(rbf)
 
         # Run Kernel Ridge Regression (need alphas!)
         Kxx = rbf(self.X_scaled)
@@ -80,7 +80,6 @@ class RKHSSHAP(object):
         self.reference = reference
 
         if z.sum() == self.m:
-            # features all active
             new_ypred = self.alphas.T @ self.k(self.X_scaled, X_new_scaled).evaluate()
             return new_ypred - reference
 
@@ -88,10 +87,19 @@ class RKHSSHAP(object):
             return 0
 
         else:
-            X_S, X_Sc = self.X_scaled[:, z], self.X_scaled[:, zc]
-            Xp_S = X_new_scaled[:, z]
-            K_SSp = self.k(X_S, Xp_S).evaluate().float()
-            K_Sc = self.k(X_Sc, X_Sc)
+            z_tensor = torch.from_numpy(z) if isinstance(z, np.ndarray) else z
+            zc_tensor = torch.from_numpy(zc) if isinstance(zc, np.ndarray) else zc
+
+            active_S = torch.where(z_tensor)[0].tolist()
+            active_Sc = torch.where(zc_tensor)[0].tolist()
+
+            k_S = self.kernel_type(active_dims=active_S)
+            k_Sc = self.kernel_type(active_dims=active_Sc)
+            k_S.raw_lengthscale.requires_grad = False
+            k_Sc.raw_lengthscale.requires_grad = False
+
+            K_SSp = k_S(self.X_scaled, X_new_scaled).evaluate().float()
+            K_Sc = k_Sc(self.X_scaled, self.X_scaled)
 
             KME_mat = K_Sc.evaluate().mean(axis=1)[:, np.newaxis] * torch.ones(
                 (self.n, n_)
@@ -118,11 +126,20 @@ class RKHSSHAP(object):
             return 0
 
         else:
-            X_S, X_Sc = self.X_scaled[:, z], self.X_scaled[:, zc]
-            Xp_S = X_new_scaled[:, z]
-            K_SSp = self.k(X_S, Xp_S).evaluate().float()
-            K_Sc = self.k(X_Sc, X_Sc)
-            K_SS = self.k(X_S, X_S)
+            z_tensor = torch.from_numpy(z) if isinstance(z, np.ndarray) else z
+            zc_tensor = torch.from_numpy(zc) if isinstance(zc, np.ndarray) else zc
+
+            active_S = torch.where(z_tensor)[0].tolist()
+            active_Sc = torch.where(zc_tensor)[0].tolist()
+
+            k_S = self.kernel_type(active_dims=active_S)
+            k_Sc = self.kernel_type(active_dims=active_Sc)
+            k_S.raw_lengthscale.requires_grad = False
+            k_Sc.raw_lengthscale.requires_grad = False
+
+            K_SSp = k_S(self.X_scaled, X_new_scaled).evaluate().float()
+            K_Sc = k_Sc(self.X_scaled, self.X_scaled)
+            K_SS = k_S(self.X_scaled, self.X_scaled)
 
             Xi_S = (
                 K_SS.add_diag(self.n * self.lambda_cme).inv_matmul(K_Sc.evaluate())
