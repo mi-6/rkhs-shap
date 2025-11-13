@@ -125,7 +125,6 @@ def test_exact_rkhs_shap_diabetes(trained_model):
     additivity_mae_I = calculate_additivity_mae(shap_values_I, model_preds, baseline)
     additivity_mae_O = calculate_additivity_mae(shap_values_O, model_preds, baseline)
 
-
     # Run KernelSHAP for comparison
     explainer = shap.KernelExplainer(gp.predict_mean_numpy, X_train.numpy())
     kernel_explanation = explainer(X_explain.numpy())

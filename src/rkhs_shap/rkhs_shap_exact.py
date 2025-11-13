@@ -19,9 +19,7 @@ from rkhs_shap.sampling import (
 
 
 class RKHSSHAP(object):
-    """[summary]
-    Implement the exact RKHS SHAP algorithm with no kernel approximation
-    """
+    """Implement the exact RKHS SHAP algorithm with no kernel approximation"""
 
     def __init__(
         self,
@@ -31,20 +29,25 @@ class RKHSSHAP(object):
         lambda_cme: float = 1e-4,
         lengthscale: torch.Tensor | None = None,
     ) -> None:
-        """[summary]
+        """Initialize exact RKHS-SHAP with Kernel Ridge Regression.
 
         Args:
-            X ([torch tensor]): [data]
-            y ([torch tensor]): [label]
-            lambda_krr ([torch float]): [RKHS norm reg]
-            lambda_cme ([type]): [Lambda CME reg]
-            lengthscale ([type]): [lengthscale for kernel]
+            X: Training features of shape (n, m)
+            y: Training targets of shape (n,) or (n, 1)
+            lambda_krr: KRR regularization parameter. Corresponds to the noise variance
+                in Gaussian Process formulation. If you've fit a GP model, set this to
+                model.likelihood.noise_covar.noise for equivalent predictions.
+            lambda_cme: Regularization for conditional/marginal mean embeddings
+            lengthscale: Optional lengthscale for RBF kernel. If provided, features
+                are scaled by 1/lengthscale before kernel computation.
         """
 
         # Store data
         self.n, self.m = X.shape
         self.X, self.y = X, y
-        self.X_scaled = (X / lengthscale).float() if lengthscale is not None else X.float()
+        self.X_scaled = (
+            (X / lengthscale).float() if lengthscale is not None else X.float()
+        )
         self.lengthscale = lengthscale
 
         lambda_krr = torch.tensor(lambda_krr, dtype=torch.float32)
@@ -167,10 +170,5 @@ class RKHSSHAP(object):
 
         clf = Ridge(wls_reg)
         clf.fit(Z, Y_target, sample_weight=weights)
-
-        self.full_shapley_values_ = np.concatenate(
-            [clf.intercept_.reshape(-1, 1), clf.coef_], axis=1
-        )
-        self.SHAP_LM = clf
 
         return clf.coef_
