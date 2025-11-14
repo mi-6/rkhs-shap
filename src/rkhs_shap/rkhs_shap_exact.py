@@ -5,7 +5,8 @@
 import torch
 from scipy.special import binom
 import numpy as np
-from gpytorch.kernels import RBFKernel
+from gpytorch.kernels import Kernel
+from copy import deepcopy
 
 # from gpytorch.lazy import lazify
 from sklearn.linear_model import Ridge
@@ -19,6 +20,7 @@ from rkhs_shap.sampling import (
 from rkhs_shap.subset_kernel import SubsetKernel
 
 
+
 class RKHSSHAP(object):
     """Implement the exact RKHS SHAP algorithm with no kernel approximation"""
 
@@ -26,21 +28,20 @@ class RKHSSHAP(object):
         self,
         X: torch.Tensor,
         y: torch.Tensor,
+        kernel: Kernel,
         lambda_krr: float = 1e-2,
         lambda_cme: float = 1e-4,
-        lengthscale: torch.Tensor | None = None,
     ) -> None:
         """Initialize exact RKHS-SHAP with Kernel Ridge Regression.
 
         Args:
             X: Training features of shape (n, m)
             y: Training targets of shape (n,) or (n, 1)
+            kernel: Fitted kernel (e.g., RBFKernel, MaternKernel)
             lambda_krr: KRR regularization parameter. Corresponds to the noise variance
                 in Gaussian Process formulation. If you've fit a GP model, set this to
                 model.likelihood.noise_covar.noise for equivalent predictions.
             lambda_cme: Regularization for conditional/marginal mean embeddings
-            lengthscale: Optional lengthscale parameter for the RBF kernel. If provided,
-                the kernel's lengthscale will be set to this value.
         """
 
         # Store data
@@ -52,19 +53,12 @@ class RKHSSHAP(object):
         self.lambda_krr = lambda_krr
         self.lambda_cme = lambda_cme
 
-        # Set up kernel
-        if lengthscale is not None and lengthscale.numel() > 1:
-            rbf = RBFKernel(ard_num_dims=self.m)
-            rbf.lengthscale = lengthscale
-        else:
-            rbf = RBFKernel()
-            if lengthscale is not None:
-                rbf.lengthscale = lengthscale
-        rbf.raw_lengthscale.requires_grad = False
-        self.k = rbf
+        self.k = deepcopy(kernel)
+        # TODO use Subkernel here too, no need to deepcopy inside SubsetKernel
+        self.k.raw_lengthscale.requires_grad = False
 
         # Run Kernel Ridge Regression (need alphas!)
-        Kxx = rbf(self.X)
+        Kxx = self.k(self.X)
         alphas = Kxx.add_diag(lambda_krr).inv_matmul(self.y)
         self.alphas = alphas.float().reshape(-1, 1)
 

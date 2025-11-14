@@ -90,15 +90,14 @@ def test_exact_rkhs_shap_diabetes(trained_model):
     gp, X_train, y_train = trained_model
 
     lambda_krr = gp.likelihood.noise.detach().cpu().float()
-    lengthscales = gp.lengthscale.detach().cpu().float()
     lambda_cme = torch.tensor(1e-4).float()
 
     rkhs_shap = RKHSSHAP(
         X=X_train,
         y=y_train,
+        kernel=gp.covar_module,
         lambda_krr=lambda_krr,
         lambda_cme=lambda_cme,
-        lengthscale=lengthscales,
     )
 
     n_explain = 10

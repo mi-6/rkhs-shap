@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore")
 from experiments.BananaShapley.gshap_banana import Observation2dBanana
 from rkhs_shap.rkhs_shap_exact import RKHSSHAP as RKHS_SHAP
 from sklearn.metrics import pairwise_distances
+from gpytorch.kernels import RBFKernel
 
 
 # For experiment 2
@@ -46,11 +47,14 @@ for iter in range(iterations):
         X_ten, y_ten = torch.tensor(X).float(), torch.tensor(y).float().reshape(-1,1)
         lambda_krr, lambda_cme = torch.tensor(1e-3), torch.tensor(1e-3)
 
+        kernel = RBFKernel()
+        kernel.lengthscale = lengthscale
+
         rkhs_shap = RKHS_SHAP(X=X_ten,
                             y=y_ten,
+                            kernel=kernel,
                             lambda_krr=lambda_krr,
-                            lambda_cme=lambda_cme,
-                            lengthscale=lengthscale)
+                            lambda_cme=lambda_cme)
         print("RMSE: ", rkhs_shap.rmse)
 
         # Set up the model for Model Agnostic SHAP
