@@ -21,7 +21,6 @@ from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters
 
 
-
 class RKHSSHAP(object):
     """Implement the exact RKHS SHAP algorithm with no kernel approximation"""
 
@@ -58,78 +57,94 @@ class RKHSSHAP(object):
         K_train = self.kernel(self.X)
         krr_weights = K_train.add_diag(noise_var).inv_matmul(self.y)
         self.krr_weights = krr_weights.reshape(-1, 1)
-        self.y_pred = K_train @ krr_weights
+        self.y_pred: torch.Tensor = K_train @ krr_weights
         self.rmse = torch.sqrt(torch.mean(self.y_pred - self.y) ** 2)
+        self.reference = self.y_pred.mean()
 
-    def _value_intervention(self, z, X_new):
+    def _value_intervention(
+        self,
+        z: np.ndarray | torch.Tensor,
+        X_new: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute interventional Shapley value function for coalition z.
 
-        n_ = X_new.shape[0]
-        zc = z == False
+        Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
+        Uses Kernel Mean Embedding (KME) to marginalize over complement features.
 
-        reference = (self.y_pred.mean() * torch.ones((1, n_))).float()
-        self.reference = reference
+        Args:
+            z: Binary coalition vector of shape (m,) indicating active features
+            X_new: Test points of shape (n_new, m)
+
+        Returns:
+            Value function evaluated at X_new, shape (1, n_new)
+        """
+        # TODO accept only numpy array as argument
+        z = z.cpu().numpy() if isinstance(z, torch.Tensor) else z
+        n_new = X_new.shape[0]
+
+        if z.sum() == 0:
+            # If no features are active, return 0
+            return 0
+
+        if z.sum() == self.m:
+            # If all features are active, return full prediction
+            new_ypred = self.krr_weights.T @ self.kernel(self.X, X_new).evaluate()
+            return new_ypred - self.reference
+
+        coalition_dims = np.where(z)[0].tolist()
+        complement_dims = np.where(~z)[0].tolist()
+
+        k_S = SubsetKernel(self.kernel, subset_dims=coalition_dims)
+        k_Sc = SubsetKernel(self.kernel, subset_dims=complement_dims)
+
+        K_SSp = k_S(self.X, X_new).evaluate().float()
+        K_Sc = k_Sc(self.X, self.X)
+
+        KME_mat = K_Sc.evaluate().mean(axis=1)[:, np.newaxis] * torch.ones(
+            (self.n, n_new)
+        )
+
+        return self.krr_weights.T @ (K_SSp * KME_mat) - self.reference
+
+    def _value_observation(
+        self,
+        z: np.ndarray | torch.Tensor,
+        X_new: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute observational Shapley value function for coalition z.
+
+        Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
+        Uses Conditional Mean Embedding (CME) to condition on observed features.
+
+        Args:
+            z: Binary coalition vector of shape (m,) indicating active features
+            X_new: Test points of shape (n_new, m)
+
+        Returns:
+            Value function evaluated at X_new, shape (1, n_new)
+        """
+        z = z.cpu().numpy() if isinstance(z, torch.Tensor) else z
+
+        if z.sum() == 0:
+            return 0
 
         if z.sum() == self.m:
             new_ypred = self.krr_weights.T @ self.kernel(self.X, X_new).evaluate()
-            return new_ypred - reference
+            return new_ypred - self.reference
 
-        elif z.sum() == 0:
-            return 0
+        coalition_dims = np.where(z)[0].tolist()
+        complement_dims = np.where(~z)[0].tolist()
 
-        else:
-            z_tensor = torch.from_numpy(z) if isinstance(z, np.ndarray) else z
-            zc_tensor = torch.from_numpy(zc) if isinstance(zc, np.ndarray) else zc
+        coalition_k = SubsetKernel(self.kernel, subset_dims=coalition_dims)
+        complement_k = SubsetKernel(self.kernel, subset_dims=complement_dims)
 
-            active_S = torch.where(z_tensor)[0].tolist()
-            active_Sc = torch.where(zc_tensor)[0].tolist()
+        K_SSp = coalition_k(self.X, X_new).evaluate().float()
+        K_Sc = complement_k(self.X, self.X)
+        K_SS = coalition_k(self.X, self.X)
 
-            k_S = SubsetKernel(self.kernel, subset_dims=active_S)
-            k_Sc = SubsetKernel(self.kernel, subset_dims=active_Sc)
+        Xi_S = (K_SS.add_diag(self.n * self.cme_reg).inv_matmul(K_Sc.evaluate())).T
 
-            K_SSp = k_S(self.X, X_new).evaluate().float()
-            K_Sc = k_Sc(self.X, self.X)
-
-            KME_mat = K_Sc.evaluate().mean(axis=1)[:, np.newaxis] * torch.ones(
-                (self.n, n_)
-            )
-
-            return self.krr_weights.T @ (K_SSp * KME_mat) - reference
-
-    def _value_observation(self, z, X_new):
-
-        n_ = X_new.shape[0]
-        zc = z == False
-
-        reference = (self.y_pred.mean() * torch.ones((1, n_))).float()
-        self.reference = reference
-
-        if z.sum() == self.m:
-            new_ypred = self.krr_weights.T @ self.kernel(self.X, X_new).evaluate()
-
-            return new_ypred - reference
-
-        elif z.sum() == 0:
-            return 0
-
-        else:
-            z_tensor = torch.from_numpy(z) if isinstance(z, np.ndarray) else z
-            zc_tensor = torch.from_numpy(zc) if isinstance(zc, np.ndarray) else zc
-
-            active_S = torch.where(z_tensor)[0].tolist()
-            active_Sc = torch.where(zc_tensor)[0].tolist()
-
-            k_S = SubsetKernel(self.kernel, subset_dims=active_S)
-            k_Sc = SubsetKernel(self.kernel, subset_dims=active_Sc)
-
-            K_SSp = k_S(self.X, X_new).evaluate().float()
-            K_Sc = k_Sc(self.X, self.X)
-            K_SS = k_S(self.X, self.X)
-
-            Xi_S = (
-                K_SS.add_diag(self.n * self.cme_reg).inv_matmul(K_Sc.evaluate())
-            ).T
-
-            return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - reference
+        return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - self.reference
 
     def fit(self, X_new, method, sample_method, num_samples=100, wls_reg=1e-10):
 
