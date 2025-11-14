@@ -2,6 +2,7 @@
 
 import torch
 import gpytorch
+import pytest
 
 from rkhs_shap.subset_kernel import SubsetKernel
 
@@ -126,3 +127,16 @@ def test_subset_kernel_with_matern_kernel():
     assert torch.all(
         eigenvalues >= -1e-6
     ), "Kernel matrix should be positive semi-definite"
+
+
+def test_subset_kernel_with_active_dims():
+    """Test SubsetKernel with a base kernel that uses active_dims."""
+    base_active_dims = [1, 3, 5, 7]
+    subset_dims = [0, 2]
+    base_kernel = gpytorch.kernels.RBFKernel(
+        ard_num_dims=len(base_active_dims), active_dims=base_active_dims
+    )
+    base_kernel.lengthscale = torch.tensor([1.0, 2.0, 3.0, 4.0])
+
+    with pytest.raises(NotImplementedError):
+        SubsetKernel(base_kernel, subset_dims=subset_dims)

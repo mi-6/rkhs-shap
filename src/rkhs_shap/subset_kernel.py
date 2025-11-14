@@ -36,6 +36,10 @@ class SubsetKernel(Kernel):
         subset_dims: Sequence[int],
     ) -> None:
         super().__init__()
+        if base_kernel.active_dims is not None:
+            raise NotImplementedError(
+                "SubsetKernel does not support base kernels with active_dims set."
+            )
 
         self.base_kernel = deepcopy(base_kernel)
         subset_dims = torch.as_tensor(subset_dims, dtype=torch.int)
