@@ -53,13 +53,13 @@ for iter in range(iterations):
         rkhs_shap = RKHS_SHAP(X=X_ten,
                             y=y_ten,
                             kernel=kernel,
-                            lambda_krr=lambda_krr,
-                            lambda_cme=lambda_cme)
+                            noise_var=lambda_krr,
+                            cme_reg=lambda_cme)
         print("RMSE: ", rkhs_shap.rmse)
 
         # Set up the model for Model Agnostic SHAP
         def predict_for_shap(X_new):
-            pred = rkhs_shap.kernel(torch.tensor(X_new).float(), rkhs_shap.X_scaled).evaluate()@rkhs_shap.alphas
+            pred = rkhs_shap.kernel(torch.tensor(X_new).float(), rkhs_shap.X_scaled).evaluate()@rkhs_shap.krr_weights
             return pred.detach().numpy().reshape(-1)
         
         # Evaluate Shapley VALUES

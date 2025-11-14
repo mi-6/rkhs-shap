@@ -96,8 +96,8 @@ def test_exact_rkhs_shap_diabetes(trained_model):
         X=X_train,
         y=y_train,
         kernel=gp.covar_module,
-        lambda_krr=lambda_krr,
-        lambda_cme=lambda_cme,
+        noise_var=lambda_krr,
+        cme_reg=lambda_cme,
     )
 
     n_explain = 10

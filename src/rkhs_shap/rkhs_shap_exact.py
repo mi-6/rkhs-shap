@@ -30,8 +30,8 @@ class RKHSSHAP(object):
         X: torch.Tensor,
         y: torch.Tensor,
         kernel: Kernel,
-        lambda_krr: float = 1e-2,
-        lambda_cme: float = 1e-4,
+        noise_var: float = 1e-2,
+        cme_reg: float = 1e-4,
     ) -> None:
         """Initialize exact RKHS-SHAP with Kernel Ridge Regression.
 
@@ -39,53 +39,38 @@ class RKHSSHAP(object):
             X: Training features of shape (n, m)
             y: Training targets of shape (n,) or (n, 1)
             kernel: Fitted kernel (e.g., RBFKernel, MaternKernel)
-            lambda_krr: KRR regularization parameter. Corresponds to the noise variance
+            noise_var: KRR regularization parameter. Corresponds to the noise variance
                 in Gaussian Process formulation. If you've fit a GP model, set this to
                 model.likelihood.noise_covar.noise for equivalent predictions.
-            lambda_cme: Regularization for conditional/marginal mean embeddings
+            cme_reg: Regularization for conditional/marginal mean embeddings
         """
-
-        # Store data
         self.n, self.m = X.shape
         self.X, self.y = X.float(), y
 
-        lambda_krr = torch.tensor(lambda_krr, dtype=torch.float32)
-        lambda_cme = torch.tensor(lambda_cme, dtype=torch.float32)
-        self.lambda_krr = lambda_krr
-        self.lambda_cme = lambda_cme
+        noise_var = torch.tensor(noise_var, dtype=torch.float32)
+        cme_reg = torch.tensor(cme_reg, dtype=torch.float32)
+        self.cme_reg = cme_reg
 
         self.kernel = deepcopy(kernel)
         freeze_parameters(self.kernel)
 
-        # Run Kernel Ridge Regression (need alphas!)
-        Kxx = self.kernel(self.X)
-        alphas = Kxx.add_diag(lambda_krr).inv_matmul(self.y)
-        self.alphas = alphas.float().reshape(-1, 1)
-
-        self.ypred = Kxx @ alphas
-        self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2)
-
-    def _create_subkernel(self, subset_dims: list[int]) -> SubsetKernel:
-        """Create a sub-kernel with specified subset dimensions.
-
-        Args:
-            subset_dims: List of dimension indices to include in the sub-kernel
-
-        Returns:
-            SubsetKernel that restricts evaluation to the specified dimensions
-        """
-        return SubsetKernel(self.kernel, subset_dims=subset_dims)
+        # Run Kernel Ridge Regression
+        K_train = self.kernel(self.X)
+        krr_weights = K_train.add_diag(noise_var).inv_matmul(self.y)
+        self.krr_weights = krr_weights.reshape(-1, 1)
+        self.y_pred = K_train @ krr_weights
+        self.rmse = torch.sqrt(torch.mean(self.y_pred - self.y) ** 2)
 
     def _value_intervention(self, z, X_new):
 
         n_ = X_new.shape[0]
         zc = z == False
 
-        reference = (self.ypred.mean() * torch.ones((1, n_))).float()
+        reference = (self.y_pred.mean() * torch.ones((1, n_))).float()
         self.reference = reference
 
         if z.sum() == self.m:
-            new_ypred = self.alphas.T @ self.kernel(self.X, X_new).evaluate()
+            new_ypred = self.krr_weights.T @ self.kernel(self.X, X_new).evaluate()
             return new_ypred - reference
 
         elif z.sum() == 0:
@@ -98,8 +83,8 @@ class RKHSSHAP(object):
             active_S = torch.where(z_tensor)[0].tolist()
             active_Sc = torch.where(zc_tensor)[0].tolist()
 
-            k_S = self._create_subkernel(active_S)
-            k_Sc = self._create_subkernel(active_Sc)
+            k_S = SubsetKernel(self.kernel, subset_dims=active_S)
+            k_Sc = SubsetKernel(self.kernel, subset_dims=active_Sc)
 
             K_SSp = k_S(self.X, X_new).evaluate().float()
             K_Sc = k_Sc(self.X, self.X)
@@ -108,18 +93,18 @@ class RKHSSHAP(object):
                 (self.n, n_)
             )
 
-            return self.alphas.T @ (K_SSp * KME_mat) - reference
+            return self.krr_weights.T @ (K_SSp * KME_mat) - reference
 
     def _value_observation(self, z, X_new):
 
         n_ = X_new.shape[0]
         zc = z == False
 
-        reference = (self.ypred.mean() * torch.ones((1, n_))).float()
+        reference = (self.y_pred.mean() * torch.ones((1, n_))).float()
         self.reference = reference
 
         if z.sum() == self.m:
-            new_ypred = self.alphas.T @ self.kernel(self.X, X_new).evaluate()
+            new_ypred = self.krr_weights.T @ self.kernel(self.X, X_new).evaluate()
 
             return new_ypred - reference
 
@@ -133,18 +118,18 @@ class RKHSSHAP(object):
             active_S = torch.where(z_tensor)[0].tolist()
             active_Sc = torch.where(zc_tensor)[0].tolist()
 
-            k_S = self._create_subkernel(active_S)
-            k_Sc = self._create_subkernel(active_Sc)
+            k_S = SubsetKernel(self.kernel, subset_dims=active_S)
+            k_Sc = SubsetKernel(self.kernel, subset_dims=active_Sc)
 
             K_SSp = k_S(self.X, X_new).evaluate().float()
             K_Sc = k_Sc(self.X, self.X)
             K_SS = k_S(self.X, self.X)
 
             Xi_S = (
-                K_SS.add_diag(self.n * self.lambda_cme).inv_matmul(K_Sc.evaluate())
+                K_SS.add_diag(self.n * self.cme_reg).inv_matmul(K_Sc.evaluate())
             ).T
 
-            return self.alphas.T @ (K_SSp * (Xi_S @ K_SSp)) - reference
+            return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - reference
 
     def fit(self, X_new, method, sample_method, num_samples=100, wls_reg=1e-10):
 
