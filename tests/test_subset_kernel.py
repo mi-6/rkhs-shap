@@ -40,16 +40,6 @@ def test_subset_kernel_rbf():
     )
 
 
-def test_subset_kernel_freezes_parameters():
-    """Test that SubsetKernel freezes all kernel parameters."""
-    base_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=4)
-    subset_kernel = SubsetKernel(base_kernel, subset_dims=[0, 2])
-    grad_flags = [
-        param.requires_grad for param in subset_kernel.base_kernel.parameters()
-    ]
-    assert not any(grad_flags), "All parameters should be frozen"
-
-
 def test_subset_kernel_deep_copy():
     """Test that SubsetKernel creates a deep copy of the base kernel."""
     base_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=5)

@@ -1,5 +1,5 @@
 from typing import Union, Sequence, Any
-import copy
+from copy import deepcopy
 
 import torch
 from torch import Tensor
@@ -33,22 +33,14 @@ class SubsetKernel(Kernel):
     def __init__(
         self,
         base_kernel: Kernel,
-        subset_dims: Union[Sequence[int], Tensor],
+        subset_dims: Sequence[int],
     ) -> None:
         super().__init__()
 
-        self.base_kernel = copy.deepcopy(base_kernel)
-
+        self.base_kernel = deepcopy(base_kernel)
         subset_dims = torch.as_tensor(subset_dims, dtype=torch.int)
         self.register_buffer("subset_dims", subset_dims)
-
         self._subset_kernel_params(self.base_kernel)
-        self._freeze_parameters()
-
-    def _freeze_parameters(self) -> None:
-        """Disable gradient computation for all kernel parameters."""
-        for param in self.base_kernel.parameters():
-            param.requires_grad_(False)
 
     def _subset_kernel_params(self, kernel: Kernel) -> None:
         """
@@ -62,17 +54,13 @@ class SubsetKernel(Kernel):
             self._recurse_nested_kernels(kernel)
             return
 
-        lengthscale = kernel.lengthscale
-        lengthscale_subset = lengthscale[..., self.subset_dims]
-
-        if hasattr(kernel, "ard_num_dims"):
+        if kernel.ard_num_dims is not None:
             kernel.ard_num_dims = len(self.subset_dims)
 
-        if hasattr(kernel, "raw_lengthscale"):
-            raw_lengthscale_subset = kernel.raw_lengthscale_constraint.inverse_transform(
-                lengthscale_subset
-            )
-            kernel.raw_lengthscale.data = raw_lengthscale_subset.data
+        if kernel.has_lengthscale:
+            kernel.raw_lengthscale.data = kernel.raw_lengthscale.data[
+                ..., self.subset_dims
+            ]
 
         self._recurse_nested_kernels(kernel)
 

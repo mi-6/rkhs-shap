@@ -18,6 +18,7 @@ from rkhs_shap.sampling import (
     subsetting_full_Z,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
+from rkhs_shap.utils import freeze_parameters
 
 
 
@@ -53,12 +54,11 @@ class RKHSSHAP(object):
         self.lambda_krr = lambda_krr
         self.lambda_cme = lambda_cme
 
-        self.k = deepcopy(kernel)
-        # TODO use Subkernel here too, no need to deepcopy inside SubsetKernel
-        self.k.raw_lengthscale.requires_grad = False
+        self.kernel = deepcopy(kernel)
+        freeze_parameters(self.kernel)
 
         # Run Kernel Ridge Regression (need alphas!)
-        Kxx = self.k(self.X)
+        Kxx = self.kernel(self.X)
         alphas = Kxx.add_diag(lambda_krr).inv_matmul(self.y)
         self.alphas = alphas.float().reshape(-1, 1)
 
@@ -74,7 +74,7 @@ class RKHSSHAP(object):
         Returns:
             SubsetKernel that restricts evaluation to the specified dimensions
         """
-        return SubsetKernel(self.k, subset_dims=subset_dims)
+        return SubsetKernel(self.kernel, subset_dims=subset_dims)
 
     def _value_intervention(self, z, X_new):
 
@@ -85,7 +85,7 @@ class RKHSSHAP(object):
         self.reference = reference
 
         if z.sum() == self.m:
-            new_ypred = self.alphas.T @ self.k(self.X, X_new).evaluate()
+            new_ypred = self.alphas.T @ self.kernel(self.X, X_new).evaluate()
             return new_ypred - reference
 
         elif z.sum() == 0:
@@ -119,7 +119,7 @@ class RKHSSHAP(object):
         self.reference = reference
 
         if z.sum() == self.m:
-            new_ypred = self.alphas.T @ self.k(self.X, X_new).evaluate()
+            new_ypred = self.alphas.T @ self.kernel(self.X, X_new).evaluate()
 
             return new_ypred - reference
 

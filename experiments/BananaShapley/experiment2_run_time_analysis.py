@@ -59,7 +59,7 @@ for iter in range(iterations):
 
         # Set up the model for Model Agnostic SHAP
         def predict_for_shap(X_new):
-            pred = rkhs_shap.k(torch.tensor(X_new).float(), rkhs_shap.X_scaled).evaluate()@rkhs_shap.alphas
+            pred = rkhs_shap.kernel(torch.tensor(X_new).float(), rkhs_shap.X_scaled).evaluate()@rkhs_shap.alphas
             return pred.detach().numpy().reshape(-1)
         
         # Evaluate Shapley VALUES
