@@ -1,6 +1,7 @@
 from itertools import combinations
-from scipy.special import binom
+
 import numpy as np
+from scipy.special import binom
 
 """This file contains code for sampling coalitions to run the weighed least square approach in RKHS-SHAP."""
 

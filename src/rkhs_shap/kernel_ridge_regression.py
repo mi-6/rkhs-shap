@@ -1,8 +1,8 @@
 """[Fitting a Kernel Ridge Regressor]"""
 
-import torch
 import gpytorch
 import numpy as np
+import torch
 from sklearn.metrics import pairwise_distances
 
 

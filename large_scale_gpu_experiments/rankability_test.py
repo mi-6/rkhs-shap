@@ -1,6 +1,7 @@
-import numpy as np
 import itertools
 from math import factorial
+
+import numpy as np
 
 
 def Hausdorff(e, s):

@@ -1,7 +1,8 @@
-import shap
-import pandas as pd
 import os
+
 import numpy as np
+import pandas as pd
+import shap
 
 if __name__ == "__main__":
     X, y = shap.datasets.adult()

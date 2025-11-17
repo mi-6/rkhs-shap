@@ -9,13 +9,14 @@ import warnings
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../")
 sys.path.append(base_dir)
 
+import matplotlib.pylab as plt
 import numpy as np
 import seaborn as sns
-import matplotlib.pylab as plt
-from rkhs_shap.shapley_regulariser import ShapleyRegulariser
-from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
-from experiments.Regularisation.correlated_linear_model import CorrelatedLinearModel
 from sklearn.metrics import pairwise_distances
+
+from experiments.Regularisation.correlated_linear_model import CorrelatedLinearModel
+from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
+from rkhs_shap.shapley_regulariser import ShapleyRegulariser
 
 MYDIR = "experiments/Regularisation/results"
 CHECK_FOLDER = os.path.isdir(MYDIR)

@@ -1,7 +1,6 @@
-from gpytorch.kernels.keops import RBFKernel
-
 import torch
 from gpytorch import settings
+from gpytorch.kernels.keops import RBFKernel
 from gpytorch.kernels.keops.keops_kernel import KEOLazyTensor
 from gpytorch.lazy import KeOpsLazyTensor
 

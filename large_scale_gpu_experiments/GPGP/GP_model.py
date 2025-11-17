@@ -1,10 +1,10 @@
-import torch
 import gpytorch
+import torch
 from gpytorch.models import ApproximateGP
-from gpytorch.variational import CholeskyVariationalDistribution
-from gpytorch.variational import VariationalStrategy
-from GPGP.keops_modules import *
+from gpytorch.variational import CholeskyVariationalDistribution, VariationalStrategy
+
 from GPGP.gpytorch_modules import *
+from GPGP.keops_modules import *
 
 
 class ExactGPGP(gpytorch.models.ExactGP):

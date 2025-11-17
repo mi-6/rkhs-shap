@@ -1,7 +1,8 @@
-import gpytorch
-import torch
 from typing import Optional
+
+import gpytorch
 import numpy as np
+import torch
 
 
 class ExactGPModel(gpytorch.models.ExactGP):

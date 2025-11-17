@@ -1,14 +1,13 @@
 import os.path
 import pickle
-import dill
-import torch
 
-from GPGP.GP_model import *
+import dill
 import numpy as np
+import torch
+from GPGP.GP_model import *
+from GPGP.KRR_model import SGD_KRR, SGD_KRR_PGP, SGD_UKRR, SGD_UKRR_PGP, SGD_KRR_base
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import StratifiedKFold
-from GPGP.KRR_model import SGD_KRR, SGD_UKRR, SGD_UKRR_PGP, SGD_KRR_PGP, SGD_KRR_base
 
 
 def sq_dist(x1, x2):

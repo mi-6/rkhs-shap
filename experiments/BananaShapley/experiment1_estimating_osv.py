@@ -4,24 +4,26 @@
 
 
 import os
-import sys
 import pickle
+import sys
 import warnings
-import torch
+
 import shap
+import torch
 
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../")
 sys.path.append(base_dir)
 
 import numpy as np
+
 from experiments.BananaShapley.banana_distribution import Banana2d
 from experiments.BananaShapley.gshap_banana import Observation2dBanana
 
 warnings.filterwarnings("ignore")
-from rkhs_shap.rkhs_shap_exact import RKHSSHAP as RKHS_SHAP
-from sklearn.metrics import mean_squared_error, pairwise_distances, r2_score
 from gpytorch.kernels import RBFKernel
+from sklearn.metrics import mean_squared_error, pairwise_distances, r2_score
 
+from rkhs_shap.rkhs_shap_exact import RKHSSHAP as RKHS_SHAP
 
 # For experiment 1
 

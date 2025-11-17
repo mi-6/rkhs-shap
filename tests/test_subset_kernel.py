@@ -1,8 +1,8 @@
 """Tests for SubsetKernel implementation."""
 
-import torch
 import gpytorch
 import pytest
+import torch
 
 from rkhs_shap.subset_kernel import SubsetKernel
 

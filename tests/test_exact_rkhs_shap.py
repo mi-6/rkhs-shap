@@ -2,11 +2,11 @@
 
 import numpy as np
 import pytest
-import torch
 import shap
+import torch
 
-from rkhs_shap.rkhs_shap_exact import RKHSSHAP
 from rkhs_shap.examples.exact_gp import ExactGPModel
+from rkhs_shap.rkhs_shap_exact import RKHSSHAP
 
 
 def calculate_additivity_mae(

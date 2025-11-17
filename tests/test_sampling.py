@@ -2,12 +2,12 @@ import numpy as np
 import pytest
 
 from rkhs_shap.sampling import (
-    generate_full_Z,
-    subset_full_Z,
-    large_scale_sample_alternative,
     _get_weights,
     _propose_func,
+    generate_full_Z,
     generate_samples_Z,
+    large_scale_sample_alternative,
+    subset_full_Z,
 )
 
 

@@ -2,22 +2,21 @@
 # KernelSHAP4K For Regression #
 ###############################
 
-import torch
-from scipy.special import binom
 import numpy as np
+import torch
 from gpytorch.kernels import RBFKernel
 from gpytorch.lazy import lazify
-from sklearn.linear_model import Ridge
 from numpy import sum
-
+from scipy.special import binom
+from sklearn.linear_model import Ridge
 from tqdm import tqdm
 
+from rkhs_shap.kernel_approx import Nystroem_gpytorch
 from rkhs_shap.sampling import (
-    large_scale_sample_alternative,
     generate_full_Z,
+    large_scale_sample_alternative,
     subset_full_Z,
 )
-from rkhs_shap.kernel_approx import Nystroem_gpytorch
 
 
 class RKHSSHAP_Approx(object):
