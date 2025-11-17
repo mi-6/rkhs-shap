@@ -1,10 +1,10 @@
-from typing import Union, Sequence, Any
 from copy import deepcopy
+from typing import Any, Sequence, Union
 
 import torch
-from torch import Tensor
 from gpytorch.kernels import Kernel
 from gpytorch.lazy import LazyEvaluatedKernelTensor
+from torch import Tensor
 
 
 class SubsetKernel(Kernel):

@@ -2,11 +2,11 @@
 
 import numpy as np
 import pytest
-import torch
 import shap
+import torch
 
-from rkhs_shap.rkhs_shap_exact import RKHSSHAP
 from rkhs_shap.examples.exact_gp import ExactGPModel
+from rkhs_shap.rkhs_shap_exact import RKHSSHAP
 
 
 def calculate_additivity_mae(
@@ -128,7 +128,9 @@ def test_exact_rkhs_shap_diabetes(trained_model):
     explainer = shap.KernelExplainer(gp.predict_mean_numpy, X_train.numpy())
     kernel_explanation = explainer(X_explain.numpy())
     kernel_values = kernel_explanation.values
-    kernel_additivity_mae = calculate_additivity_mae(kernel_values, model_preds, baseline)
+    kernel_additivity_mae = calculate_additivity_mae(
+        kernel_values, model_preds, baseline
+    )
 
     # Normalize MAEs by prediction range for better interpretability
     pred_range = (model_preds.max() - model_preds.min()).item()
@@ -154,7 +156,7 @@ def test_exact_rkhs_shap_diabetes(trained_model):
     mean_corr_I = np.mean(corr_I)
     mean_corr_O = np.mean(corr_O)
 
-    print(f"\nCorrelation with KernelSHAP:")
+    print("\nCorrelation with KernelSHAP:")
     print(f"  Interventional: {mean_corr_I:.3f}")
     print(f"  Observational: {mean_corr_O:.3f}")
 
@@ -164,23 +166,29 @@ def test_exact_rkhs_shap_diabetes(trained_model):
     assert shap_values_O.shape == (n_explain, X_train.shape[1])
 
     # 2. Additivity error should be reasonably small (within 10% of prediction range)
-    assert additivity_mae_I < 0.005, f"Interventional additivity error too large: {additivity_mae_I}"
-    assert additivity_mae_O < 0.005, f"Observational additivity error too large: {additivity_mae_O}"
+    assert additivity_mae_I < 0.005, (
+        f"Interventional additivity error too large: {additivity_mae_I}"
+    )
+    assert additivity_mae_O < 0.005, (
+        f"Observational additivity error too large: {additivity_mae_O}"
+    )
 
     # 3. Correlation with KernelSHAP should be high
-    assert mean_corr_I > 0.99, \
+    assert mean_corr_I > 0.99, (
         f"Interventional correlation with KernelSHAP too low: {mean_corr_I}"
-    assert mean_corr_O > 0.85, \
+    )
+    assert mean_corr_O > 0.85, (
         f"Observational correlation with KernelSHAP too low: {mean_corr_O}"
+    )
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Test passed! Summary:")
     print(f"  RKHS-SHAP Interventional additivity MAE: {additivity_mae_I:.6f}")
     print(f"  RKHS-SHAP Observational additivity MAE:  {additivity_mae_O:.6f}")
     print(f"  KernelSHAP additivity MAE:                {kernel_additivity_mae:.6f}")
     print(f"  Correlation with KernelSHAP (I):          {mean_corr_I:.3f}")
     print(f"  Correlation with KernelSHAP (O):          {mean_corr_O:.3f}")
-    print("="*60)
+    print("=" * 60)
 
 
 if __name__ == "__main__":

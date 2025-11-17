@@ -1,11 +1,12 @@
-from gpytorch.functions import RBFCovariance
-from gpytorch.settings import trace_mode
-import gpytorch
-from gpytorch.kernels import Kernel
 import torch
+from gpytorch.functions import RBFCovariance
+from gpytorch.kernels import Kernel
+from gpytorch.settings import trace_mode
+
 
 def postprocess_rbf(dist_mat):
     return dist_mat.div_(-2).exp_()
+
 
 class SkewRBFKernel(Kernel):
     r"""
@@ -68,8 +69,8 @@ class SkewRBFKernel(Kernel):
     has_lengthscale = True
 
     def forward(self, x1, x2, diag=False, **params):
-        xa,xb = torch.chunk(x1,dim=1,chunks=2)
-        xc,xd = torch.chunk(x2,dim=1,chunks=2)
+        xa, xb = torch.chunk(x1, dim=1, chunks=2)
+        xc, xd = torch.chunk(x2, dim=1, chunks=2)
         ls, _ = torch.chunk(self.lengthscale, dim=1, chunks=2)
 
         if (
@@ -85,40 +86,88 @@ class SkewRBFKernel(Kernel):
             xc_ = xc.div(ls)
             xd_ = xd.div(ls)
             return self.covar_dist(
-                xa_, xc_, square_dist=True, diag=diag, dist_postprocess_func=postprocess_rbf, postprocess=True, **params
-            )*self.covar_dist(
-                xb_, xd_, square_dist=True, diag=diag, dist_postprocess_func=postprocess_rbf, postprocess=True, **params
-            )-self.covar_dist(
-                xa_, xd_, square_dist=True, diag=diag, dist_postprocess_func=postprocess_rbf, postprocess=True, **params
-            )*self.covar_dist(
-                xb_, xc_, square_dist=True, diag=diag, dist_postprocess_func=postprocess_rbf, postprocess=True, **params
+                xa_,
+                xc_,
+                square_dist=True,
+                diag=diag,
+                dist_postprocess_func=postprocess_rbf,
+                postprocess=True,
+                **params,
+            ) * self.covar_dist(
+                xb_,
+                xd_,
+                square_dist=True,
+                diag=diag,
+                dist_postprocess_func=postprocess_rbf,
+                postprocess=True,
+                **params,
+            ) - self.covar_dist(
+                xa_,
+                xd_,
+                square_dist=True,
+                diag=diag,
+                dist_postprocess_func=postprocess_rbf,
+                postprocess=True,
+                **params,
+            ) * self.covar_dist(
+                xb_,
+                xc_,
+                square_dist=True,
+                diag=diag,
+                dist_postprocess_func=postprocess_rbf,
+                postprocess=True,
+                **params,
             )
         return RBFCovariance.apply(
             xa,
             xc,
             ls,
             lambda x1, x2: self.covar_dist(
-                x1, x2, square_dist=True, diag=False, dist_postprocess_func=postprocess_rbf, postprocess=False, **params
+                x1,
+                x2,
+                square_dist=True,
+                diag=False,
+                dist_postprocess_func=postprocess_rbf,
+                postprocess=False,
+                **params,
             ),
-        )*RBFCovariance.apply(
+        ) * RBFCovariance.apply(
             xb,
             xd,
             ls,
             lambda x1, x2: self.covar_dist(
-                x1, x2, square_dist=True, diag=False, dist_postprocess_func=postprocess_rbf, postprocess=False, **params
+                x1,
+                x2,
+                square_dist=True,
+                diag=False,
+                dist_postprocess_func=postprocess_rbf,
+                postprocess=False,
+                **params,
             ),
         ) - RBFCovariance.apply(
             xa,
             xd,
             ls,
             lambda x1, x2: self.covar_dist(
-                x1, x2, square_dist=True, diag=False, dist_postprocess_func=postprocess_rbf, postprocess=False, **params
+                x1,
+                x2,
+                square_dist=True,
+                diag=False,
+                dist_postprocess_func=postprocess_rbf,
+                postprocess=False,
+                **params,
             ),
-        )*RBFCovariance.apply(
+        ) * RBFCovariance.apply(
             xb,
             xc,
             ls,
             lambda x1, x2: self.covar_dist(
-                x1, x2, square_dist=True, diag=False, dist_postprocess_func=postprocess_rbf, postprocess=False, **params
+                x1,
+                x2,
+                square_dist=True,
+                diag=False,
+                dist_postprocess_func=postprocess_rbf,
+                postprocess=False,
+                **params,
             ),
         )

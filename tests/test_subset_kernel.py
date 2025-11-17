@@ -1,8 +1,8 @@
 """Tests for SubsetKernel implementation."""
 
-import torch
 import gpytorch
 import pytest
+import torch
 
 from rkhs_shap.subset_kernel import SubsetKernel
 
@@ -124,9 +124,9 @@ def test_subset_kernel_with_matern_kernel():
 
     # Check that kernel is positive semi-definite
     eigenvalues = torch.linalg.eigvalsh(kernel_actual)
-    assert torch.all(
-        eigenvalues >= -1e-6
-    ), "Kernel matrix should be positive semi-definite"
+    assert torch.all(eigenvalues >= -1e-6), (
+        "Kernel matrix should be positive semi-definite"
+    )
 
 
 def test_subset_kernel_with_active_dims():

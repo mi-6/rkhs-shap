@@ -1,13 +1,18 @@
-"""[Fitting a Kernel Ridge Regressor]
-"""
-import torch, gpytorch
+"""[Fitting a Kernel Ridge Regressor]"""
+
+import gpytorch
 import numpy as np
+import torch
 from sklearn.metrics import pairwise_distances
 
 
 def compute_median_heuristic(X):
-    median_heuristic = [np.median(pairwise_distances(X[:, [i]].reshape(-1,1))) for i in range(X.shape[1])]
+    median_heuristic = [
+        np.median(pairwise_distances(X[:, [i]].reshape(-1, 1)))
+        for i in range(X.shape[1])
+    ]
     return torch.tensor(median_heuristic)
+
 
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, lengthscale):
@@ -23,16 +28,13 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
 
 class KernelRidgeRegressor(object):
-    
     def __init__(self, X, y):
         self.X = torch.tensor(X).float()
         self.y = torch.tensor(y).float()
         self.fit_switch = 0
-        #self.lengthscale = compute_median_heuristic(X)
+        # self.lengthscale = compute_median_heuristic(X)
 
-        
     def fit(self, epoch=500, lr=1e-1, verbose=True, lengthscale=None):
-
         # define a GP model for optimisation
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         model = ExactGPModel(self.X, self.y, likelihood, lengthscale)
@@ -52,37 +54,26 @@ class KernelRidgeRegressor(object):
 
             if verbose:
                 if i % 200 == 0:
-                    print('Iter %d/%d - Loss: %.3f   noise: %.3f' % (
-                        i + 1, epoch, loss.item(),
-                        model.likelihood.noise.item()
-                    ))
-            
+                    print(
+                        "Iter %d/%d - Loss: %.3f   noise: %.3f"
+                        % (i + 1, epoch, loss.item(), model.likelihood.noise.item())
+                    )
+
             optim.step()
-        
+
         # Store optimal parameters
         self.k = model.covar_module
         self.k.raw_lengthscale.require_grad = False
         self.lmda = torch.tensor(model.likelihood.noise.item())
-        
 
         # Create alphas
         Kxx = self.k(self.X)
         self.alpha = Kxx.add_diag(self.lmda).inv_matmul(self.y)
 
         self.flip_switch = 1
-    
-    def predict(self, X_test):
 
+    def predict(self, X_test):
         X_test = torch.tensor(X_test).float()
         Kxnx = self.k(X_test, self.X)
 
         return (Kxnx.evaluate() @ self.alpha).detach().numpy()
-
-
-
-
-
-
-
-
-
