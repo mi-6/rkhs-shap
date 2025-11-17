@@ -56,11 +56,27 @@ class RKHSSHAP(object):
 
         # Run Kernel Ridge Regression
         K_train = self.kernel(self.X)
-        krr_weights = K_train.add_diag(noise_var).inv_matmul(self.y)
-        self.krr_weights: Tensor = krr_weights.reshape(-1, 1)
-        self.ypred: Tensor = K_train @ krr_weights
-        self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2)
-        self.reference = self.ypred.mean()
+        krr_weights: Tensor = K_train.add_diag(noise_var).inv_matmul(self.y)
+
+        self.krr_weights = krr_weights.reshape(-1, 1)
+        self.ypred = K_train @ krr_weights
+        self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2).item()
+        self.reference = self.ypred.mean().item()
+
+    def _get_subset_kernels(self, z: np.ndarray):
+        """Extract coalition and complement kernels from binary coalition vector.
+
+        Args:
+            z: Binary coalition vector of shape (m,) indicating active features
+
+        Returns:
+            Tuple of (S_kernel, Sc_kernel) - SubsetKernel instances for coalition and complement
+        """
+        S = np.where(z)[0]
+        Sc = np.where(~z)[0]
+        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
+        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+        return S_kernel, Sc_kernel
 
     def _value_intervention(
         self,
@@ -97,10 +113,7 @@ class RKHSSHAP(object):
         # S represents which features are "present" or "known" when computing the value function
         # Sp (S prime) refers to test points where we evaluate the value function
         # Sc (S complement) is the complement set - features NOT in S
-        S = np.where(z)[0].tolist()
-        Sc = np.where(~z)[0].tolist()
-        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
-        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+        S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
         K_SSp = S_kernel(self.X, X_test).evaluate().float()
         K_Sc = Sc_kernel(self.X, self.X).evaluate()
@@ -134,11 +147,7 @@ class RKHSSHAP(object):
             ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).evaluate()
             return ypred_test - self.reference
 
-        S = np.where(z)[0].tolist()
-        Sc = np.where(~z)[0].tolist()
-
-        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
-        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+        S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
         K_SSp = S_kernel(self.X, X_test).evaluate().float()
         K_Sc = Sc_kernel(self.X, self.X)
@@ -151,7 +160,7 @@ class RKHSSHAP(object):
 
     def fit(self, X_test, method, sample_method, num_samples=100, wls_reg=1e-10):
 
-        n_ = X_test.shape[0]
+        n_test = X_test.shape[0]
 
         if sample_method == "MC":
             Z = large_scale_sample_alternative(self.m, num_samples)
@@ -163,7 +172,7 @@ class RKHSSHAP(object):
 
         # Set up containers
         epoch = Z.shape[0]
-        Y_target = np.zeros((epoch, n_))
+        Y_target = np.zeros((epoch, n_test))
 
         count = 0
         weights = []
