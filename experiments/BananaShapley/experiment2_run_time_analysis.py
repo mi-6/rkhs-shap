@@ -66,12 +66,12 @@ for iter in range(iterations):
 
         # RKHS SHAP
         start_time = time.time()
-        B_I = rkhs_shap.fit(X_new=X_ten, method="I", sample_method="full", num_samples=100, wls_reg=0)
+        B_I = rkhs_shap.fit(X_test=X_ten, method="I", sample_method="full", num_samples=100, wls_reg=0)
         end_time = time.time()
         B_I_time = end_time - start_time
 
         start_time = time.time()
-        B_O = rkhs_shap.fit(X_new=X_ten, method="O", sample_method="full", num_samples=100, wls_reg=0)
+        B_O = rkhs_shap.fit(X_test=X_ten, method="O", sample_method="full", num_samples=100, wls_reg=0)
         end_time = time.time()
         B_O_time = end_time - start_time
 

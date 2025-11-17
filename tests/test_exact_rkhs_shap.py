@@ -105,14 +105,14 @@ def test_exact_rkhs_shap_diabetes(trained_model):
 
     # Compute Interventional RKHS-SHAP
     shap_values_I = rkhs_shap.fit(
-        X_new=X_explain,
+        X_test=X_explain,
         method="I",  # Interventional
         sample_method="full",
     )
 
     # Compute Observational RKHS-SHAP
     shap_values_O = rkhs_shap.fit(
-        X_new=X_explain,
+        X_test=X_explain,
         method="O",  # Observational
         sample_method="full",
     )

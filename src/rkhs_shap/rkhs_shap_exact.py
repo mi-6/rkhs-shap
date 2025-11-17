@@ -57,14 +57,14 @@ class RKHSSHAP(object):
         K_train = self.kernel(self.X)
         krr_weights = K_train.add_diag(noise_var).inv_matmul(self.y)
         self.krr_weights = krr_weights.reshape(-1, 1)
-        self.y_pred: torch.Tensor = K_train @ krr_weights
-        self.rmse = torch.sqrt(torch.mean(self.y_pred - self.y) ** 2)
-        self.reference = self.y_pred.mean()
+        self.ypred: torch.Tensor = K_train @ krr_weights
+        self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2)
+        self.reference = self.ypred.mean()
 
     def _value_intervention(
         self,
         z: np.ndarray | torch.Tensor,
-        X_new: torch.Tensor,
+        X_test: torch.Tensor,
     ) -> torch.Tensor:
         """Compute interventional Shapley value function for coalition z.
 
@@ -73,14 +73,14 @@ class RKHSSHAP(object):
 
         Args:
             z: Binary coalition vector of shape (m,) indicating active features
-            X_new: Test points of shape (n_new, m)
+            X_test: Test points of shape (n_test, m)
 
         Returns:
-            Value function evaluated at X_new, shape (1, n_new)
+            Value function evaluated at X_test, shape (1, n_test)
         """
         # TODO accept only numpy array as argument
         z = z.cpu().numpy() if isinstance(z, torch.Tensor) else z
-        n_new = X_new.shape[0]
+        n_test = X_test.shape[0]
 
         if z.sum() == 0:
             # If no features are active, return 0
@@ -88,20 +88,19 @@ class RKHSSHAP(object):
 
         if z.sum() == self.m:
             # If all features are active, return full prediction
-            new_ypred = self.krr_weights.T @ self.kernel(self.X, X_new).evaluate()
-            return new_ypred - self.reference
+            ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).evaluate()
+            return ypred_test - self.reference
 
         coalition_dims = np.where(z)[0].tolist()
         complement_dims = np.where(~z)[0].tolist()
+        coalition_k = SubsetKernel(self.kernel, subset_dims=coalition_dims)
+        complement_k = SubsetKernel(self.kernel, subset_dims=complement_dims)
 
-        k_S = SubsetKernel(self.kernel, subset_dims=coalition_dims)
-        k_Sc = SubsetKernel(self.kernel, subset_dims=complement_dims)
-
-        K_SSp = k_S(self.X, X_new).evaluate().float()
-        K_Sc = k_Sc(self.X, self.X)
+        K_SSp = coalition_k(self.X, X_test).evaluate().float()
+        K_Sc = complement_k(self.X, self.X)
 
         KME_mat = K_Sc.evaluate().mean(axis=1)[:, np.newaxis] * torch.ones(
-            (self.n, n_new)
+            (self.n, n_test)
         )
 
         return self.krr_weights.T @ (K_SSp * KME_mat) - self.reference
@@ -109,7 +108,7 @@ class RKHSSHAP(object):
     def _value_observation(
         self,
         z: np.ndarray | torch.Tensor,
-        X_new: torch.Tensor,
+        X_test: torch.Tensor,
     ) -> torch.Tensor:
         """Compute observational Shapley value function for coalition z.
 
@@ -118,10 +117,10 @@ class RKHSSHAP(object):
 
         Args:
             z: Binary coalition vector of shape (m,) indicating active features
-            X_new: Test points of shape (n_new, m)
+            X_test: Test points of shape (n_test, m)
 
         Returns:
-            Value function evaluated at X_new, shape (1, n_new)
+            Value function evaluated at X_test, shape (1, n_test)
         """
         z = z.cpu().numpy() if isinstance(z, torch.Tensor) else z
 
@@ -129,8 +128,8 @@ class RKHSSHAP(object):
             return 0
 
         if z.sum() == self.m:
-            new_ypred = self.krr_weights.T @ self.kernel(self.X, X_new).evaluate()
-            return new_ypred - self.reference
+            ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).evaluate()
+            return ypred_test - self.reference
 
         coalition_dims = np.where(z)[0].tolist()
         complement_dims = np.where(~z)[0].tolist()
@@ -138,7 +137,7 @@ class RKHSSHAP(object):
         coalition_k = SubsetKernel(self.kernel, subset_dims=coalition_dims)
         complement_k = SubsetKernel(self.kernel, subset_dims=complement_dims)
 
-        K_SSp = coalition_k(self.X, X_new).evaluate().float()
+        K_SSp = coalition_k(self.X, X_test).evaluate().float()
         K_Sc = complement_k(self.X, self.X)
         K_SS = coalition_k(self.X, self.X)
 
@@ -146,9 +145,9 @@ class RKHSSHAP(object):
 
         return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - self.reference
 
-    def fit(self, X_new, method, sample_method, num_samples=100, wls_reg=1e-10):
+    def fit(self, X_test, method, sample_method, num_samples=100, wls_reg=1e-10):
 
-        n_ = X_new.shape[0]
+        n_ = X_test.shape[0]
 
         if sample_method == "MC":
             Z = large_scale_sample_alternative(self.m, num_samples)
@@ -176,9 +175,9 @@ class RKHSSHAP(object):
                 )
 
             if method == "O":
-                Y_target[count, :] = self._value_observation(row, X_new)
+                Y_target[count, :] = self._value_observation(row, X_test)
             elif method == "I":
-                Y_target[count, :] = self._value_intervention(row, X_new)
+                Y_target[count, :] = self._value_intervention(row, X_test)
             else:
                 raise ValueError("Must be either interventional or observational")
 

@@ -73,8 +73,8 @@ for iter in range(iterations):
         # Evaluate Shapley VALUES
 
         # RKHS SHAP
-        B_I = rkhs_shap.fit(X_new=X_ten, method="I", sample_method="full", num_samples=100, wls_reg=0)
-        B_O = rkhs_shap.fit(X_new=X_ten, method="O", sample_method="full", num_samples=100, wls_reg=0)
+        B_I = rkhs_shap.fit(X_test=X_ten, method="I", sample_method="full", num_samples=100, wls_reg=0)
+        B_O = rkhs_shap.fit(X_test=X_ten, method="O", sample_method="full", num_samples=100, wls_reg=0)
 
         # KernelSHAP
         X_scaled = X/compute_mh(X)
