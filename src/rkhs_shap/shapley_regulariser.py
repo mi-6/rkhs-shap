@@ -9,7 +9,7 @@ import numpy as np
 from gpytorch.kernels import RBFKernel
 from gpytorch.lazy import lazify
 from tqdm import tqdm
-from rkhs_shap.sampling import large_scale_sample_alternative, generate_full_Z, subsetting_full_Z
+from rkhs_shap.sampling import large_scale_sample_alternative, generate_full_Z, subset_full_Z
 from rkhs_shap.kernel_approx import Nystroem_gpytorch
 
 

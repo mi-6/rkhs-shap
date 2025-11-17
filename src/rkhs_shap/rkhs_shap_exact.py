@@ -16,7 +16,7 @@ from tqdm import tqdm
 from rkhs_shap.sampling import (
     large_scale_sample_alternative,
     generate_full_Z,
-    subsetting_full_Z,
+    subset_full_Z,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters
@@ -170,7 +170,7 @@ class RKHSSHAP(object):
             Z = large_scale_sample_alternative(self.m, num_samples)
         elif sample_method == "MC2":
             Z = generate_full_Z(self.m)
-            Z = subsetting_full_Z(Z, samples=num_samples)
+            Z = subset_full_Z(Z, samples=num_samples)
         else:
             Z = generate_full_Z(self.m)
 
