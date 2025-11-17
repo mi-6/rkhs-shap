@@ -24,7 +24,7 @@ class Nystroem_gpytorch(object):
         self.kernel = kernel
 
     def fit(self, X):
-        X = X/self.ls
+        X = X / self.ls
 
         km = KMeans(n_clusters=self.n_components)
         km.fit(X)
@@ -35,20 +35,22 @@ class Nystroem_gpytorch(object):
         if active_dims is None:
             active_dims = np.array([True for i in range(X.shape[1])])
 
-        X = X/self.ls
+        X = X / self.ls
 
         sub_X = torch.tensor(X[:, active_dims]).float()
-        
+
         sub_landmarks = torch.tensor(self.landmarks[:, active_dims]).float()
 
-        ZT = self.kernel(sub_landmarks).add_jitter().cholesky().inv_matmul(self.kernel(sub_landmarks, sub_X).evaluate())
+        ZT = (
+            self.kernel(sub_landmarks)
+            .add_jitter()
+            .cholesky()
+            .inv_matmul(self.kernel(sub_landmarks, sub_X).evaluate())
+        )
 
-        #return (ZT.T).detach().numpy()
+        # return (ZT.T).detach().numpy()
         return ZT.T
 
     def compute_kernel(self, X, active_dims=None):
-
         Z = self.transform(X=X, active_dims=active_dims)
         return Z @ Z.T
-
-

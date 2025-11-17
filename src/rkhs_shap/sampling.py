@@ -111,7 +111,7 @@ def _get_weights(s: int, m: int) -> float:
     Returns:
         Unnormalised probability weight
     """
-    return (m - 1) / ((binom(m, s) * s * (m - s)))
+    return (m - 1) / (binom(m, s) * s * (m - s))
 
 
 def _propose_func(z: np.ndarray) -> np.ndarray:
@@ -158,7 +158,11 @@ def generate_samples_Z(m: int, mcmc_run: int, warm_up_cut: int) -> np.ndarray:
         else:
             # the alpha score in MCMC
             a_t = np.min(
-                [1, _get_weights(int(propose_s), int(m)) / _get_weights(int(current_s), int(m))]
+                [
+                    1,
+                    _get_weights(int(propose_s), int(m))
+                    / _get_weights(int(current_s), int(m)),
+                ]
             )
 
             flip = np.random.uniform()

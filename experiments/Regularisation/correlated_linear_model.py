@@ -7,11 +7,23 @@ from tqdm import tqdm
 from scipy.special import binom
 import numpy as np
 
-from rkhs_shap.sampling import large_scale_sample_alternative, generate_full_Z, subset_full_Z
+from rkhs_shap.sampling import (
+    large_scale_sample_alternative,
+    generate_full_Z,
+    subset_full_Z,
+)
+
 
 class CorrelatedLinearModel(object):
-
-    def __init__(self, n: np.int, noise: np.float=1e-1, mean_vec: np.array=None, Sigma: np.array=None, beta: np.array=None, random_state: np.int=None):
+    def __init__(
+        self,
+        n: np.int,
+        noise: np.float = 1e-1,
+        mean_vec: np.array = None,
+        Sigma: np.array = None,
+        beta: np.array = None,
+        random_state: np.int = None,
+    ):
         """[Correlated Linear Model]
         This is a correlated linear model class where one could simulate observations where
         inputs are correlated and compute its Observational and Interventional Shapley Values as well.
@@ -32,10 +44,10 @@ class CorrelatedLinearModel(object):
 
         # Simulate the data
         np.random.seed(random_state)
-        
+
         # Mean 0 multivariate
         X = np.random.multivariate_normal(mean=mean_vec, cov=Sigma, size=n)
-        y = X@beta + noise*np.random.normal(size=(n))
+        y = X @ beta + noise * np.random.normal(size=(n))
 
         self.X, self.y = X, y
 
@@ -52,10 +64,10 @@ class CorrelatedLinearModel(object):
 
         # Mean 0 multivariate Gaussian
         reference = self.y.mean()
-        
+
         if z.sum() == self.m:
             # E[f(X_S)|X_S=x] basically means everything is conditioned
-            return X@self.beta - reference
+            return X @ self.beta - reference
         elif z.sum() == 0:
             return 0
         else:
@@ -65,9 +77,19 @@ class CorrelatedLinearModel(object):
             Sigma_Sc = self.Sigma[zc][:, zc]
             Sigma_SSc = self.Sigma[z][:, zc]
 
-            return X_S @ beta_S + X_S @ np.linalg.inv(Sigma_S) @ Sigma_SSc @ beta_Sc - reference
-    
-    def kernelSHAP(self, X: np.array, sample_method: str="Full", num_samples: int=1000, verbose: bool=True):
+            return (
+                X_S @ beta_S
+                + X_S @ np.linalg.inv(Sigma_S) @ Sigma_SSc @ beta_Sc
+                - reference
+            )
+
+    def kernelSHAP(
+        self,
+        X: np.array,
+        sample_method: str = "Full",
+        num_samples: int = 1000,
+        verbose: bool = True,
+    ):
         """[Run the KernelSHAP algorithm to retrieve shapley values]
 
         Args:
@@ -79,12 +101,12 @@ class CorrelatedLinearModel(object):
 
         n = X.shape[0]
 
-        if sample_method=="MC":
+        if sample_method == "MC":
             Z = large_scale_sample_alternative(self.m, num_samples)
-        elif sample_method=="MC2":
+        elif sample_method == "MC2":
             Z = generate_full_Z(self.m)
             Z = subset_full_Z(Z, samples=num_samples)
-        elif sample_method=="Full":
+        elif sample_method == "Full":
             Z = generate_full_Z(self.m)
 
         epoch = Z.shape[0]
@@ -98,19 +120,31 @@ class CorrelatedLinearModel(object):
                     weights.append(1e-5)
                 else:
                     z = row
-                    weights.append(1/((self.m - 1) / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))))
+                    weights.append(
+                        1
+                        / (
+                            (self.m - 1)
+                            / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
+                        )
+                    )
 
                 Y_target[count, :] = self._observational_value_function(row, X)
 
                 count += 1
-            
+
         else:
             for row in Z:
                 if np.sum(row) == 0 or np.sum(row) == self.m:
                     weights.append(1e-5)
                 else:
                     z = row
-                    weights.append(1/((self.m - 1) / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))))
+                    weights.append(
+                        1
+                        / (
+                            (self.m - 1)
+                            / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
+                        )
+                    )
 
                 Y_target[count, :] = self._observational_value_function(row, X)
 
@@ -119,7 +153,9 @@ class CorrelatedLinearModel(object):
         clf = Ridge(1e-5)
         clf.fit(Z, Y_target, sample_weight=weights)
 
-        self.full_shapley_values_ = np.concatenate([clf.intercept_.reshape(-1, 1), clf.coef_], axis=1)
+        self.full_shapley_values_ = np.concatenate(
+            [clf.intercept_.reshape(-1, 1), clf.coef_], axis=1
+        )
         self.SHAP_LM = clf
 
         return clf.coef_

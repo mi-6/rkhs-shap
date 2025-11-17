@@ -2,7 +2,14 @@
 # Experiment 2#
 ###############
 
-import os, sys, torch, shap, time, pickle, warnings
+import os
+import sys
+import torch
+import shap
+import time
+import pickle
+import warnings
+
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../")
 sys.path.append(base_dir)
 
@@ -26,57 +33,65 @@ result = []
 
 for iter in range(iterations):
     for n in n_ls:
-        
         banana2d = Banana2d(n=n, v=v, b=b, noise=0, outlier_quantile=3)
-        
+
         scale = 1
-        y = banana2d.y/scale
+        y = banana2d.y / scale
         X = banana2d.X
 
-        compute_mh = lambda X: np.array([np.median(pairwise_distances(X[:, [i]])) for i in range(X.shape[1])])
+        compute_mh = lambda X: np.array(
+            [np.median(pairwise_distances(X[:, [i]])) for i in range(X.shape[1])]
+        )
         lengthscale = torch.tensor(compute_mh(X)).float()
         lengthscale[1] *= 1
         print("Lengthscale:", lengthscale)
 
         # True OSVs:
-        phi1 = banana2d.phi_1/scale
-        phi2 = banana2d.phi_2/scale
+        phi1 = banana2d.phi_1 / scale
+        phi2 = banana2d.phi_2 / scale
         PHI = np.array([phi1, phi2]).T
 
         # Compute RKHSSHAP
-        X_ten, y_ten = torch.tensor(X).float(), torch.tensor(y).float().reshape(-1,1)
+        X_ten, y_ten = torch.tensor(X).float(), torch.tensor(y).float().reshape(-1, 1)
         lambda_krr, lambda_cme = torch.tensor(1e-3), torch.tensor(1e-3)
 
         kernel = RBFKernel()
         kernel.lengthscale = lengthscale
 
-        rkhs_shap = RKHS_SHAP(X=X_ten,
-                            y=y_ten,
-                            kernel=kernel,
-                            noise_var=lambda_krr,
-                            cme_reg=lambda_cme)
+        rkhs_shap = RKHS_SHAP(
+            X=X_ten, y=y_ten, kernel=kernel, noise_var=lambda_krr, cme_reg=lambda_cme
+        )
         print("RMSE: ", rkhs_shap.rmse)
 
         # Set up the model for Model Agnostic SHAP
         def predict_for_shap(X_new):
-            pred = rkhs_shap.kernel(torch.tensor(X_new).float(), rkhs_shap.X_scaled).evaluate()@rkhs_shap.krr_weights
+            pred = (
+                rkhs_shap.kernel(
+                    torch.tensor(X_new).float(), rkhs_shap.X_scaled
+                ).evaluate()
+                @ rkhs_shap.krr_weights
+            )
             return pred.detach().numpy().reshape(-1)
-        
+
         # Evaluate Shapley VALUES
 
         # RKHS SHAP
         start_time = time.time()
-        B_I = rkhs_shap.fit(X_test=X_ten, method="I", sample_method="full", num_samples=100, wls_reg=0)
+        B_I = rkhs_shap.fit(
+            X_test=X_ten, method="I", sample_method="full", num_samples=100, wls_reg=0
+        )
         end_time = time.time()
         B_I_time = end_time - start_time
 
         start_time = time.time()
-        B_O = rkhs_shap.fit(X_test=X_ten, method="O", sample_method="full", num_samples=100, wls_reg=0)
+        B_O = rkhs_shap.fit(
+            X_test=X_ten, method="O", sample_method="full", num_samples=100, wls_reg=0
+        )
         end_time = time.time()
         B_O_time = end_time - start_time
 
         # KernelSHAP
-        X_scaled = X/compute_mh(X)
+        X_scaled = X / compute_mh(X)
 
         start_time = time.time()
         explainer = shap.KernelExplainer(predict_for_shap, X_scaled)
@@ -84,24 +99,22 @@ for iter in range(iterations):
         end_time = time.time()
         KSHAP_time = end_time - start_time
 
-
         # Multivariate Guassian
         start_time = time.time()
         ogshap = Observation2dBanana(predict_for_shap, X_scaled)
-        ophi1, ophi2 = ogshap.fit(X_scaled, num_samples=n)    
+        ophi1, ophi2 = ogshap.fit(X_scaled, num_samples=n)
         end_time = time.time()
         OGSHAP_time = end_time - start_time
-        OPHI = np.array([ophi1,ophi2]).T
+        OPHI = np.array([ophi1, ophi2]).T
 
         # Collect Result
-        print("At iteration %i" %iter)
-        print("At n=%f" %n)
-        print("ISV takes: %.2f"%B_I_time)
-        print("OSV takes: %.2f"%B_O_time)
-        print("KSHAP takes: %.2f"%KSHAP_time)
-        print('OGSHAP takes: %.2f'%OGSHAP_time)
+        print("At iteration %i" % iter)
+        print("At n=%f" % n)
+        print("ISV takes: %.2f" % B_I_time)
+        print("OSV takes: %.2f" % B_O_time)
+        print("KSHAP takes: %.2f" % KSHAP_time)
+        print("OGSHAP takes: %.2f" % OGSHAP_time)
         print("\n")
-
 
         result.append([B_I_time, B_O_time, KSHAP_time, OGSHAP_time, n, iter])
 

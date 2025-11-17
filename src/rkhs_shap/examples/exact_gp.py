@@ -106,5 +106,5 @@ if __name__ == "__main__":
     ss_tot = torch.sum((test_y - torch.mean(test_y)) ** 2)
     r2_score = 1 - (ss_res / ss_tot)
 
-    print(f"\nModel Evaluation:")
+    print("\nModel Evaluation:")
     print(f"R² test-score: {r2_score.item():.4f}")

@@ -4,12 +4,14 @@
 
 import copy
 import torch
-from scipy.special import binom
 import numpy as np
 from gpytorch.kernels import RBFKernel
 from gpytorch.lazy import lazify
 from tqdm import tqdm
-from rkhs_shap.sampling import large_scale_sample_alternative, generate_full_Z, subset_full_Z
+from rkhs_shap.sampling import (
+    large_scale_sample_alternative,
+    generate_full_Z,
+)
 from rkhs_shap.kernel_approx import Nystroem_gpytorch
 
 
@@ -33,8 +35,9 @@ def insert_i(ls, feature_to_exclude):
 
 
 class ShapleyRegulariser(object):
-
-    def __init__(self, lambda_sv: float, lambda_krr: float, lambda_cme: float, n_components: int):
+    def __init__(
+        self, lambda_sv: float, lambda_krr: float, lambda_cme: float, n_components: int
+    ):
         """[Initialisation]
 
         Args:
@@ -48,25 +51,25 @@ class ShapleyRegulariser(object):
         self.lambda_krr = lambda_krr
         self.lambda_sv = lambda_sv
         self.n_components = n_components
-        
+
         self.Z = None
         self.nystroem = None
-    
+
     def _get_int_embedding(self, z, X):
         """
         Compute the interventional embedding
         """
-        
+
         zc = z == False
         n, m = X.shape
-        
+
         if z.sum() == m:
             return self.Z @ self.Z.T
         elif z.sum() == 0:
             return (self.Kx.mean(axis=1) * torch.ones((n, n))).T
         else:
             Z_S = self.nystroem.transform(X, active_dims=z)
-            K_SS = Z_S @ Z_S.T 
+            K_SS = Z_S @ Z_S.T
 
             Z_Sc = self.nystroem.transform(X, active_dims=zc)
             K_Sc = Z_Sc @ Z_Sc.T
@@ -74,7 +77,7 @@ class ShapleyRegulariser(object):
             KME_mat = K_Sc.mean(axis=1)[:, np.newaxis] * torch.ones((n, n))
 
             return K_SS * KME_mat
-    
+
     def _get_obsv_embedding(self, z, X):
         """
         Compute the observational embedding
@@ -92,12 +95,25 @@ class ShapleyRegulariser(object):
             K_SS = Z_S @ Z_S.T
 
             Z_Sc = self.nystroem.transform(X, active_dims=zc)
-            cme_latter_part = lazify(Z_S.T @ Z_S).add_diag(torch.tensor(self.lambda_cme).float()).inv_matmul(Z_S.T)
-            holder = (K_SS * (Z_Sc @ Z_Sc.T @ Z_S @ cme_latter_part))
+            cme_latter_part = (
+                lazify(Z_S.T @ Z_S)
+                .add_diag(torch.tensor(self.lambda_cme).float())
+                .inv_matmul(Z_S.T)
+            )
+            holder = K_SS * (Z_Sc @ Z_Sc.T @ Z_S @ cme_latter_part)
 
             return holder
-        
-    def fit(self, X: float, y: float, ls: float, features_index: list, method: str="O", num_samples: int=300, sample_method: str="MC"):
+
+    def fit(
+        self,
+        X: float,
+        y: float,
+        ls: float,
+        features_index: list,
+        method: str = "O",
+        num_samples: int = 300,
+        sample_method: str = "MC",
+    ):
         """[summary]
 
         Args:
@@ -110,7 +126,6 @@ class ShapleyRegulariser(object):
             sample_method (str, optional): [sampling method to compute shapley functionals]. Defaults to "MC".
         """
 
-
         self.X = X
         self.n, self.m = X.shape
         self.ls = ls
@@ -118,14 +133,13 @@ class ShapleyRegulariser(object):
         rbf = RBFKernel()
         rbf.raw_lengthscale.requires_grad = False
 
-        ny = Nystroem_gpytorch(kernel=rbf,
-                                lengthscale=self.ls,
-                                n_components=self.n_components
-                                )
+        ny = Nystroem_gpytorch(
+            kernel=rbf, lengthscale=self.ls, n_components=self.n_components
+        )
         ny.fit(self.X)
         Phi = ny.transform(self.X)
         self.Z = Phi
-        Kx = Phi@Phi.T
+        Kx = Phi @ Phi.T
 
         self.nystroem = ny
         self.Kx = Kx
@@ -139,7 +153,7 @@ class ShapleyRegulariser(object):
 
         for row in tqdm(Z_exclude_i):
             Sui, S = insert_i(row, feature_to_exclude=features_index)
-            
+
             if method == "O":
                 sui = self._get_obsv_embedding(Sui, X)
                 s = self._get_obsv_embedding(S, X)
@@ -151,10 +165,12 @@ class ShapleyRegulariser(object):
                 s = self._get_int_embedding(S, X)
 
                 A += (sui - s).numpy()
-            
+
             else:
-                raise ValueError("Method must either be Observational or Interventional")
-            
+                raise ValueError(
+                    "Method must either be Observational or Interventional"
+                )
+
         A = A / Z_exclude_i.shape[0]
 
         self.A = A
@@ -162,22 +178,25 @@ class ShapleyRegulariser(object):
         # Formulate the regression
         y_ten = torch.tensor(y).reshape(-1, 1).float()
         A = lazify(torch.tensor(A).float())
-        self.AAt = A@A.t()
-        K = rbf(torch.tensor(X/ls)).float()
-        alphas = (K@K + self.lambda_krr * K + self.lambda_sv*self.AAt).add_jitter().inv_matmul(K.matmul(y_ten))
+        self.AAt = A @ A.t()
+        K = rbf(torch.tensor(X / ls)).float()
+        alphas = (
+            (K @ K + self.lambda_krr * K + self.lambda_sv * self.AAt)
+            .add_jitter()
+            .inv_matmul(K.matmul(y_ten))
+        )
 
         self.alphas = alphas
         ypred = K.matmul(alphas)
 
-        print("RMSE: %.2f" %torch.sqrt(torch.mean((y_ten - ypred)**2)))
+        print("RMSE: %.2f" % torch.sqrt(torch.mean((y_ten - ypred) ** 2)))
 
-        self.RMSE = torch.sqrt(torch.mean((y_ten - ypred)**2)).numpy()
+        self.RMSE = torch.sqrt(torch.mean((y_ten - ypred) ** 2)).numpy()
         self.ypred = ypred
 
     def predict(self, X_test):
-
         # obtain kernel K_{test, train} first
         Z_test = self.nystroem.transform(X_test)
         K_xpx = Z_test @ self.Z.T
 
-        return K_xpx@self.alphas
+        return K_xpx @ self.alphas

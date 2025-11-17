@@ -12,7 +12,11 @@ from numpy import sum
 
 from tqdm import tqdm
 
-from rkhs_shap.sampling import large_scale_sample_alternative, generate_full_Z, subset_full_Z
+from rkhs_shap.sampling import (
+    large_scale_sample_alternative,
+    generate_full_Z,
+    subset_full_Z,
+)
 from rkhs_shap.kernel_approx import Nystroem_gpytorch
 
 
@@ -21,15 +25,15 @@ class RKHSSHAP_Approx(object):
     Instantiate this class to run the RKHS-SHAP algorithm. Nystroem approximation is used by default.
     """
 
-    def __init__(self,
-                 X: np.array,
-                 y: np.array,
-                 lambda_krr: float = 1e-2,
-                 lambda_cme: float = 1e-3,
-                 lengthscale: np.array = None,
-                 n_components: int = 100
-                 ):
-
+    def __init__(
+        self,
+        X: np.array,
+        y: np.array,
+        lambda_krr: float = 1e-2,
+        lambda_cme: float = 1e-3,
+        lengthscale: np.array = None,
+        n_components: int = 100,
+    ):
         """[summary]
 
         Args:
@@ -48,7 +52,7 @@ class RKHSSHAP_Approx(object):
         self.X_scaled = X / lengthscale
         self.ls = lengthscale
         self.y = y
- 
+
         self.lambda_cme = lambda_cme
         self.lambda_krr = lambda_krr
         self.num_components = n_components
@@ -61,19 +65,22 @@ class RKHSSHAP_Approx(object):
         if n_components is None:
             raise ValueError("Input number of landmark points")
 
-        ny = Nystroem_gpytorch(kernel=rbf,
-                                lengthscale=self.ls,
-                                n_components=n_components
-                                )
+        ny = Nystroem_gpytorch(
+            kernel=rbf, lengthscale=self.ls, n_components=n_components
+        )
         ny.fit(self.X)
         Z = ny.transform(self.X)
         Kx = Z @ Z.T
 
-        alphas = lazify(Kx).add_diag(torch.tensor(self.lambda_krr)).inv_matmul(torch.tensor(y.reshape(-1, 1)).float())
+        alphas = (
+            lazify(Kx)
+            .add_diag(torch.tensor(self.lambda_krr))
+            .inv_matmul(torch.tensor(y.reshape(-1, 1)).float())
+        )
 
         self.ypred = Kx @ alphas
         self.y_ten = torch.tensor(y).reshape(-1, 1).float()
-        self.rmse = torch.sqrt(torch.mean((self.ypred - self.y_ten)**2))
+        self.rmse = torch.sqrt(torch.mean((self.ypred - self.y_ten) ** 2))
 
         # Store alphas and nystroem object
         self.Z = Z
@@ -92,7 +99,7 @@ class RKHSSHAP_Approx(object):
         """
 
         n_ = X_new.shape[0]
-        zc = (z == False)
+        zc = z == False
 
         # compute the reference value - using previously trained data
         reference = (self.ypred.mean() * torch.ones((1, n_))).float()
@@ -159,7 +166,11 @@ class RKHSSHAP_Approx(object):
 
             # Only using marginal measure from data, not new points
             Z_Sc = self.nystroem.transform(self.X, active_dims=zc)
-            cme_latter_part = lazify(Z_S.T @ Z_S).add_diag(torch.tensor(self.lambda_cme).float()).inv_matmul(Z_S_new.T)
+            cme_latter_part = (
+                lazify(Z_S.T @ Z_S)
+                .add_diag(torch.tensor(self.lambda_cme).float())
+                .inv_matmul(Z_S_new.T)
+            )
             holder = self.alphas.T @ (K_SSn * (Z_Sc @ Z_Sc.T @ Z_S @ cme_latter_part))
 
             if substract_ref:
@@ -167,7 +178,15 @@ class RKHSSHAP_Approx(object):
             else:
                 return holder
 
-    def fit(self, X_new: np.array, method: str="O", sample_method: str="MC", num_samples: int=1000, substract_ref: bool=True, verbose: str=False):
+    def fit(
+        self,
+        X_new: np.array,
+        method: str = "O",
+        sample_method: str = "MC",
+        num_samples: int = 1000,
+        substract_ref: bool = True,
+        verbose: str = False,
+    ):
         """[Running the RKHS SHAP Algorithm to explain kernel ridge regression]
 
         Args:
@@ -182,14 +201,14 @@ class RKHSSHAP_Approx(object):
 
         n_ = X_new.shape[0]
 
-        if sample_method=="MC":
+        if sample_method == "MC":
             Z = large_scale_sample_alternative(self.m, num_samples)
-        elif sample_method=="MC2":
+        elif sample_method == "MC2":
             Z = generate_full_Z(self.m)
             Z = subset_full_Z(Z, samples=num_samples)
         else:
             Z = generate_full_Z(self.m)
-        
+
         # Set up containers
         epoch = Z.shape[0]
         Y_target = np.zeros((epoch, n_))
@@ -200,32 +219,48 @@ class RKHSSHAP_Approx(object):
         if verbose:
             for row in tqdm(Z):
                 if np.sum(row) == 0 or np.sum(row) == self.m:
-                    weights.append(1e+5)
+                    weights.append(1e5)
                 else:
                     z = row
-                    weights.append((self.m - 1) / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z))))
-                
+                    weights.append(
+                        (self.m - 1)
+                        / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
+                    )
+
                 if method == "O":
-                    Y_target[count, :] = self._value_intervention(row, X_new, substract_ref)
+                    Y_target[count, :] = self._value_intervention(
+                        row, X_new, substract_ref
+                    )
                 elif method == "I":
-                    Y_target[count, :] = self._value_observation(row, X_new, substract_ref)
+                    Y_target[count, :] = self._value_observation(
+                        row, X_new, substract_ref
+                    )
                 else:
                     raise ValueError("Must be either interventional or observational")
 
                 count += 1
-        
+
         else:
             for row in Z:
                 if np.sum(row) == 0 or np.sum(row) == self.m:
-                    weights.append(1e+5)
+                    weights.append(1e5)
                 else:
                     z = row
-                    weights.append(((self.m - 1) / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))))
-                
+                    weights.append(
+                        (
+                            (self.m - 1)
+                            / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
+                        )
+                    )
+
                 if method == "O":
-                    Y_target[count, :] = self._value_intervention(row, X_new, substract_ref)
+                    Y_target[count, :] = self._value_intervention(
+                        row, X_new, substract_ref
+                    )
                 elif method == "I":
-                    Y_target[count, :] = self._value_observation(row, X_new, substract_ref)
+                    Y_target[count, :] = self._value_observation(
+                        row, X_new, substract_ref
+                    )
                 else:
                     raise ValueError("Must be either interventional or observational")
 
@@ -234,7 +269,9 @@ class RKHSSHAP_Approx(object):
         clf = Ridge(1e-5)
         clf.fit(Z, Y_target, sample_weight=weights)
 
-        self.full_shapley_values_ = np.concatenate([clf.intercept_.reshape(-1, 1), clf.coef_], axis=1)
+        self.full_shapley_values_ = np.concatenate(
+            [clf.intercept_.reshape(-1, 1), clf.coef_], axis=1
+        )
         self.SHAP_LM = clf
 
         return clf.coef_

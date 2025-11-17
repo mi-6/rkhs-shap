@@ -2,28 +2,28 @@ import shap
 import pandas as pd
 import os
 import numpy as np
-if __name__ == '__main__':
-    X,y = shap.datasets.adult()
+
+if __name__ == "__main__":
+    X, y = shap.datasets.adult()
     print(X.columns)
     X = X.values
-    y = np.where(np.array(y)*1.0==0,-1,1)
-    if not os.path.exists('census'):
-        os.makedirs('census')
-    fn='census'
-    with open(f'{fn}/X.npy', 'wb') as f:
+    y = np.where(np.array(y) * 1.0 == 0, -1, 1)
+    if not os.path.exists("census"):
+        os.makedirs("census")
+    fn = "census"
+    with open(f"{fn}/X.npy", "wb") as f:
         np.save(f, X)
-    with open(f'{fn}/y.npy', 'wb') as f:
+    with open(f"{fn}/y.npy", "wb") as f:
         np.save(f, y)
 
-##############
-
+    ##############
 
     prefix = "archive/"
-    matches = pd.read_csv(prefix+"matches.csv")
-    participants = pd.read_csv(prefix+"participants.csv")
-    stats1 = pd.read_csv(prefix+"stats1.csv", low_memory=False)
-    stats2 = pd.read_csv(prefix+"stats2.csv", low_memory=False)
-    stats = pd.concat([stats1,stats2])
+    matches = pd.read_csv(prefix + "matches.csv")
+    participants = pd.read_csv(prefix + "participants.csv")
+    stats1 = pd.read_csv(prefix + "stats1.csv", low_memory=False)
+    stats2 = pd.read_csv(prefix + "stats2.csv", low_memory=False)
+    stats = pd.concat([stats1, stats2])
 
     # merge into a single DataFrame
     a = pd.merge(participants, matches, left_on="matchid", right_on="id")
@@ -31,12 +31,12 @@ if __name__ == '__main__':
     allstats = allstats_orig.copy()
 
     # drop games that lasted less than 10 minutes
-    allstats = allstats.loc[allstats["duration"] >= 10*60,:]
+    allstats = allstats.loc[allstats["duration"] >= 10 * 60, :]
 
     # Convert string-based categories to numeric values
     cat_cols = ["role", "position", "version", "platformid"]
     for c in cat_cols:
-        allstats[c] = allstats[c].astype('category')
+        allstats[c] = allstats[c].astype("category")
         allstats[c] = allstats[c].cat.codes
     allstats["wardsbought"] = allstats["wardsbought"].astype(np.int32)
 
@@ -45,18 +45,45 @@ if __name__ == '__main__':
 
     # convert all features we want to consider as rates
     rate_features = [
-        "kills", "deaths", "assists", "killingsprees", "doublekills",
-        "triplekills", "quadrakills", "pentakills", "legendarykills",
-        "totdmgdealt", "magicdmgdealt", "physicaldmgdealt", "truedmgdealt",
-        "totdmgtochamp", "magicdmgtochamp", "physdmgtochamp", "truedmgtochamp",
-        "totheal", "totunitshealed", "dmgtoobj", "timecc", "totdmgtaken",
-        "magicdmgtaken" , "physdmgtaken", "truedmgtaken", "goldearned", "goldspent",
-        "totminionskilled", "neutralminionskilled", "ownjunglekills",
-        "enemyjunglekills", "totcctimedealt", "pinksbought", "wardsbought",
-        "wardsplaced", "wardskilled"
+        "kills",
+        "deaths",
+        "assists",
+        "killingsprees",
+        "doublekills",
+        "triplekills",
+        "quadrakills",
+        "pentakills",
+        "legendarykills",
+        "totdmgdealt",
+        "magicdmgdealt",
+        "physicaldmgdealt",
+        "truedmgdealt",
+        "totdmgtochamp",
+        "magicdmgtochamp",
+        "physdmgtochamp",
+        "truedmgtochamp",
+        "totheal",
+        "totunitshealed",
+        "dmgtoobj",
+        "timecc",
+        "totdmgtaken",
+        "magicdmgtaken",
+        "physdmgtaken",
+        "truedmgtaken",
+        "goldearned",
+        "goldspent",
+        "totminionskilled",
+        "neutralminionskilled",
+        "ownjunglekills",
+        "enemyjunglekills",
+        "totcctimedealt",
+        "pinksbought",
+        "wardsbought",
+        "wardsplaced",
+        "wardskilled",
     ]
     for feature_name in rate_features:
-        X[feature_name] /= X["duration"] / 60 # per minute rate
+        X[feature_name] /= X["duration"] / 60  # per minute rate
 
     # convert to fraction of game
     X["longesttimespentliving"] /= X["duration"]
@@ -101,19 +128,19 @@ if __name__ == '__main__':
         "wardsplaced": "Wards placed per min.",
         "turretkills": "# of turret kills",
         "inhibkills": "# of inhibitor kills",
-        "dmgtoturrets": "Damage to turrets"
+        "dmgtoturrets": "Damage to turrets",
     }
     feature_names = [full_names.get(n, n) for n in X.columns]
     print(feature_names)
     X.columns = feature_names
     X = X.values
     y = y.values
-    y = np.where(np.array(y)*1.0==0,-1,1)
+    y = np.where(np.array(y) * 1.0 == 0, -1, 1)
 
-    if not os.path.exists('LOL'):
-        os.makedirs('LOL')
-    fn='LOL'
-    with open(f'{fn}/X.npy', 'wb') as f:
+    if not os.path.exists("LOL"):
+        os.makedirs("LOL")
+    fn = "LOL"
+    with open(f"{fn}/X.npy", "wb") as f:
         np.save(f, X)
-    with open(f'{fn}/y.npy', 'wb') as f:
+    with open(f"{fn}/y.npy", "wb") as f:
         np.save(f, y)
