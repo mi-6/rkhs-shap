@@ -25,9 +25,8 @@ def generate_full_Z(m: int) -> np.ndarray:
         for i in list(perm_s):
             Z[count, i] = True
             count += 1
-    Z = Z == True
 
-    return Z
+    return Z.astype(np.bool_)
 
 
 def subset_full_Z(Z: np.ndarray, samples: int = 1000) -> np.ndarray:
@@ -68,10 +67,11 @@ def large_scale_sample_alternative(m: int, n_samples: int) -> np.ndarray:
         n_samples: number of samples you want
 
     Returns:
-        Z: The matrix of ones and 0s. If want boolean, can do ==True.
+        Z: The matrix of boolean values
     """
 
-    prob_per_size = lambda m, s: (m - 1) / (s * (m - s))
+    def prob_per_size(m: int, s: int) -> float:
+        return (m - 1) / (s * (m - s))
 
     samples_container = []
 
@@ -86,14 +86,12 @@ def large_scale_sample_alternative(m: int, n_samples: int) -> np.ndarray:
         all_ones[:size] = 1
         shuffled_ind = np.random.choice(range(m), size=m, replace=False)
         new_sample = all_ones[shuffled_ind]
-        # paired_sample = new_sample*-1 + 1
         samples_container.append(new_sample)
-        # samples_container.append(paired_sample)
 
-    samples_container = np.array(samples_container) == True
+    samples_container = np.array(samples_container).astype(np.bool_)
 
-    samples_container[-2, :] = [False for i in range(m)]
-    samples_container[-1, :] = [True for i in range(m)]
+    samples_container[-2, :] = False
+    samples_container[-1, :] = True
 
     return samples_container
 
@@ -117,6 +115,16 @@ def _get_weights(s: int, m: int) -> float:
 
 
 def _propose_func(z: np.ndarray) -> np.ndarray:
+    """Propose a new MCMC state by flipping one element.
+
+    WARNING: This function modifies z in-place.
+
+    Args:
+        z: Current state vector with values in {-1, 1}
+
+    Returns:
+        The modified array (same object as input)
+    """
     m = len(z)
     index = np.random.choice(m)
     z[index] = -z[index]
@@ -140,11 +148,11 @@ def generate_samples_Z(m: int, mcmc_run: int, warm_up_cut: int) -> np.ndarray:
 
     count = 0
     while count <= mcmc_run:
-        propose = _propose_func(z_vec[count])
+        propose = _propose_func(z_vec[count].copy())
         propose_s = (propose == 1).sum()
         current_s = (z_vec[count] == 1).sum()
 
-        # This two cases should have probability 0 reaching there
+        # These two cases should have probability 0 reaching there
         if propose_s == m or propose_s == 0:
             continue
         else:
