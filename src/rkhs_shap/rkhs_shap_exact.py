@@ -158,10 +158,14 @@ class RKHSSHAP(object):
 
         return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - self.reference
 
-    def fit(self, X_test, method, sample_method, num_samples=100, wls_reg=1e-10):
-
-        n_test = X_test.shape[0]
-
+    def fit(
+        self,
+        X_test: Tensor,
+        method: str,
+        sample_method: str,
+        num_samples: int = 100,
+        wls_reg: float = 1e-10,
+    ) -> np.ndarray:
         if sample_method == "MC":
             Z = large_scale_sample_alternative(self.m, num_samples)
         elif sample_method == "MC2":
@@ -170,10 +174,9 @@ class RKHSSHAP(object):
         else:
             Z = generate_full_Z(self.m)
 
-        # Set up containers
-        epoch = Z.shape[0]
-        Y_target = np.zeros((epoch, n_test))
-
+        n_coalitions = Z.shape[0]
+        n_test = X_test.shape[0]
+        Y_target = np.zeros((n_coalitions, n_test))
         count = 0
         weights = []
 
