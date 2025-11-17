@@ -78,11 +78,7 @@ class RKHSSHAP(object):
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
         return S_kernel, Sc_kernel
 
-    def _value_intervention(
-        self,
-        z: np.ndarray | Tensor,
-        X_test: Tensor,
-    ) -> Tensor:
+    def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
 
         Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
@@ -95,8 +91,6 @@ class RKHSSHAP(object):
         Returns:
             Value function evaluated at X_test, shape (1, n_test)
         """
-        # TODO accept only numpy array as argument
-        z = z.cpu().numpy() if isinstance(z, Tensor) else z
         n_test = X_test.shape[0]
 
         if z.sum() == 0:
@@ -121,11 +115,7 @@ class RKHSSHAP(object):
 
         return self.krr_weights.T @ (K_SSp * KME_mat) - self.reference
 
-    def _value_observation(
-        self,
-        z: np.ndarray | Tensor,
-        X_test: Tensor,
-    ) -> Tensor:
+    def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute observational Shapley value function for coalition z.
 
         Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
@@ -138,8 +128,6 @@ class RKHSSHAP(object):
         Returns:
             Value function evaluated at X_test, shape (1, n_test)
         """
-        z = z.cpu().numpy() if isinstance(z, Tensor) else z
-
         if z.sum() == 0:
             return 0
 
