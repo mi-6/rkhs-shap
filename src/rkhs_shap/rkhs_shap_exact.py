@@ -3,6 +3,7 @@
 ###############################
 
 import torch
+from torch import Tensor
 from scipy.special import binom
 import numpy as np
 from gpytorch.kernels import Kernel
@@ -26,8 +27,8 @@ class RKHSSHAP(object):
 
     def __init__(
         self,
-        X: torch.Tensor,
-        y: torch.Tensor,
+        X: Tensor,
+        y: Tensor,
         kernel: Kernel,
         noise_var: float = 1e-2,
         cme_reg: float = 1e-4,
@@ -56,16 +57,16 @@ class RKHSSHAP(object):
         # Run Kernel Ridge Regression
         K_train = self.kernel(self.X)
         krr_weights = K_train.add_diag(noise_var).inv_matmul(self.y)
-        self.krr_weights = krr_weights.reshape(-1, 1)
-        self.ypred: torch.Tensor = K_train @ krr_weights
+        self.krr_weights: Tensor = krr_weights.reshape(-1, 1)
+        self.ypred: Tensor = K_train @ krr_weights
         self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2)
         self.reference = self.ypred.mean()
 
     def _value_intervention(
         self,
-        z: np.ndarray | torch.Tensor,
-        X_test: torch.Tensor,
-    ) -> torch.Tensor:
+        z: np.ndarray | Tensor,
+        X_test: Tensor,
+    ) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
 
         Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
@@ -79,7 +80,7 @@ class RKHSSHAP(object):
             Value function evaluated at X_test, shape (1, n_test)
         """
         # TODO accept only numpy array as argument
-        z = z.cpu().numpy() if isinstance(z, torch.Tensor) else z
+        z = z.cpu().numpy() if isinstance(z, Tensor) else z
         n_test = X_test.shape[0]
 
         if z.sum() == 0:
@@ -91,25 +92,27 @@ class RKHSSHAP(object):
             ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).evaluate()
             return ypred_test - self.reference
 
-        coalition_dims = np.where(z)[0].tolist()
-        complement_dims = np.where(~z)[0].tolist()
-        coalition_k = SubsetKernel(self.kernel, subset_dims=coalition_dims)
-        complement_k = SubsetKernel(self.kernel, subset_dims=complement_dims)
+        # Naming conventions:
+        # S ⊆ {1, 2, ..., m} is a subset of all m features (coalition)
+        # S represents which features are "present" or "known" when computing the value function
+        # Sp (S prime) refers to test points where we evaluate the value function
+        # Sc (S complement) is the complement set - features NOT in S
+        S = np.where(z)[0].tolist()
+        Sc = np.where(~z)[0].tolist()
+        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
+        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
 
-        K_SSp = coalition_k(self.X, X_test).evaluate().float()
-        K_Sc = complement_k(self.X, self.X)
-
-        KME_mat = K_Sc.evaluate().mean(axis=1)[:, np.newaxis] * torch.ones(
-            (self.n, n_test)
-        )
+        K_SSp = S_kernel(self.X, X_test).evaluate().float()
+        K_Sc = Sc_kernel(self.X, self.X).evaluate()
+        KME_mat = K_Sc.mean(axis=1, keepdim=True).repeat(1, n_test)
 
         return self.krr_weights.T @ (K_SSp * KME_mat) - self.reference
 
     def _value_observation(
         self,
-        z: np.ndarray | torch.Tensor,
-        X_test: torch.Tensor,
-    ) -> torch.Tensor:
+        z: np.ndarray | Tensor,
+        X_test: Tensor,
+    ) -> Tensor:
         """Compute observational Shapley value function for coalition z.
 
         Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
@@ -122,7 +125,7 @@ class RKHSSHAP(object):
         Returns:
             Value function evaluated at X_test, shape (1, n_test)
         """
-        z = z.cpu().numpy() if isinstance(z, torch.Tensor) else z
+        z = z.cpu().numpy() if isinstance(z, Tensor) else z
 
         if z.sum() == 0:
             return 0
@@ -131,16 +134,17 @@ class RKHSSHAP(object):
             ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).evaluate()
             return ypred_test - self.reference
 
-        coalition_dims = np.where(z)[0].tolist()
-        complement_dims = np.where(~z)[0].tolist()
+        S = np.where(z)[0].tolist()
+        Sc = np.where(~z)[0].tolist()
 
-        coalition_k = SubsetKernel(self.kernel, subset_dims=coalition_dims)
-        complement_k = SubsetKernel(self.kernel, subset_dims=complement_dims)
+        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
+        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
 
-        K_SSp = coalition_k(self.X, X_test).evaluate().float()
-        K_Sc = complement_k(self.X, self.X)
-        K_SS = coalition_k(self.X, self.X)
+        K_SSp = S_kernel(self.X, X_test).evaluate().float()
+        K_Sc = Sc_kernel(self.X, self.X)
+        K_SS = S_kernel(self.X, self.X)
 
+        # Conditional Mean Embedding operator: maps complement features to coalition features
         Xi_S = (K_SS.add_diag(self.n * self.cme_reg).inv_matmul(K_Sc.evaluate())).T
 
         return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - self.reference
