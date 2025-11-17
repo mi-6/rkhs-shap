@@ -8,22 +8,20 @@ import sys
 import time
 import warnings
 
+import numpy as np
 import shap
 import torch
+from gpytorch.kernels import RBFKernel
+from sklearn.metrics import pairwise_distances
 
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../")
 sys.path.append(base_dir)
 
-import numpy as np
-
-from experiments.BananaShapley.banana_distribution import Banana2d
+from experiments.BananaShapley.banana_distribution import Banana2d  # noqa: E402
+from experiments.BananaShapley.gshap_banana import Observation2dBanana  # noqa: E402
+from rkhs_shap.rkhs_shap_exact import RKHSSHAP as RKHS_SHAP  # noqa: E402
 
 warnings.filterwarnings("ignore")
-from gpytorch.kernels import RBFKernel
-from sklearn.metrics import pairwise_distances
-
-from experiments.BananaShapley.gshap_banana import Observation2dBanana
-from rkhs_shap.rkhs_shap_exact import RKHSSHAP as RKHS_SHAP
 
 # For experiment 2
 
@@ -41,9 +39,11 @@ for iter in range(iterations):
         y = banana2d.y / scale
         X = banana2d.X
 
-        compute_mh = lambda X: np.array(
-            [np.median(pairwise_distances(X[:, [i]])) for i in range(X.shape[1])]
-        )
+        def compute_mh(X):
+            return np.array(
+                [np.median(pairwise_distances(X[:, [i]])) for i in range(X.shape[1])]
+            )
+
         lengthscale = torch.tensor(compute_mh(X)).float()
         lengthscale[1] *= 1
         print("Lengthscale:", lengthscale)

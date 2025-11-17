@@ -4,7 +4,6 @@ import pickle
 import dill
 import numpy as np
 import torch
-from GPGP.GP_model import *
 from GPGP.KRR_model import SGD_KRR, SGD_KRR_PGP, SGD_UKRR, SGD_UKRR_PGP, SGD_KRR_base
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -287,11 +286,11 @@ class train_GP:
         r_load = np.load(self.dataset_string + "/r_processed.npy", allow_pickle=True)
         y_load = np.load(self.dataset_string + "/y.npy", allow_pickle=True)
         if self.double_up:
-            l = np.concatenate([l_load, r_load], axis=0)
+            left = np.concatenate([l_load, r_load], axis=0)
             r = np.concatenate([r_load, l_load], axis=0)
             y = np.concatenate([y_load, -1.0 * y_load], axis=0)
         else:
-            l = l_load
+            left = l_load
             r = r_load
             y = y_load
 
@@ -322,11 +321,11 @@ class train_GP:
             self.test_u = self.scaler_u.transform(u[test_ind])
         # test_set = np.concatenate([val_ind,test_ind],axis=0)
         self.scaler = StandardScaler()
-        self.left_tr, self.right_tr = l[tr_ind], r[tr_ind]
+        self.left_tr, self.right_tr = left[tr_ind], r[tr_ind]
         self.left_tr = self.scaler.fit_transform(self.left_tr)
         self.right_tr = self.scaler.fit_transform(self.right_tr)
-        self.left_val, self.right_val = l[val_ind], r[val_ind]
-        self.left_test, self.right_test = l[test_ind], r[test_ind]
+        self.left_val, self.right_val = left[val_ind], r[val_ind]
+        self.left_test, self.right_test = left[test_ind], r[test_ind]
         self.left_val = self.scaler.fit_transform(self.left_val)
         self.right_val = self.scaler.fit_transform(self.right_val)
         self.left_test = self.scaler.fit_transform(self.left_test)

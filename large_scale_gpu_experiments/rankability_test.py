@@ -22,11 +22,11 @@ def specR(a):  # if this thing is close to 0, then your shit can't be ranked...
     n = len(a)
     x = np.array([np.sum(a[i, :]) for i in range(n)])
     d = np.diag(x)
-    l = d - a
+    laplacian = d - a
     # perfect dominance graph spectrum and out-degree
     s = np.array([n - k for k in range(1, n + 1)])
     # eigenvalues of given graph Laplacian
-    e = np.linalg.eigvals(l)
+    e = np.linalg.eigvals(laplacian)
     # rankability measure
     return 1.0 - ((Hausdorff(e, s) + Hausdorff(x, s)) / (2 * (n - 1)))
 

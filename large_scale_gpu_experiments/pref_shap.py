@@ -1,7 +1,6 @@
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from GPGP.kernel import *
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from tensor_CG import tensor_CG
 from torch.utils.data import DataLoader, TensorDataset
@@ -402,7 +401,7 @@ class pref_shap:
                 last_flag = True
             else:
                 inv_tens.append(self.k_U(self.X_U[:, S], None, S))
-                u_S, u_Sc = u[:, S], u[:, S_C]
+                u_S = u[:, S]
                 u_bar, u_bar_Sc = self.u[:, S], self.u[:, S_C]
                 vec_cat = self.k_U(self.X_U[:, S], u_S, S)
                 vec_c_cat = self.k_U(u_bar_Sc, self.X_U[:, S_C], S_C)

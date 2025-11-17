@@ -1,4 +1,4 @@
-from utils import *
+from utils import train_krr_simple
 
 # import pykeops
 # pykeops.clean_pykeops()

@@ -71,10 +71,9 @@ class CorrelatedLinearModel(object):
         elif z.sum() == 0:
             return 0
         else:
-            X_S, X_Sc = X[:, z], X[:, zc]
+            X_S = X[:, z]
             beta_S, beta_Sc = self.beta[z], self.beta[zc]
             Sigma_S = self.Sigma[z][:, z]
-            Sigma_Sc = self.Sigma[zc][:, zc]
             Sigma_SSc = self.Sigma[z][:, zc]
 
             return (

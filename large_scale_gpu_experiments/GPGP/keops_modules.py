@@ -10,7 +10,8 @@ class skewedRBF(RBFKernel):
         # x1_ = x1.div(self.lengthscale)
         # x2_ = x2.div(self.lengthscale)
 
-        covar_func = lambda x1, x2, diag=diag: self.covar_func(x1, x2, diag)
+        def covar_func(x1, x2, diag=diag):
+            return self.covar_func(x1, x2, diag)
 
         if diag:
             return covar_func(x1, x2, diag=True)

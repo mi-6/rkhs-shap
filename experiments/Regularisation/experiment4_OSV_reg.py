@@ -1,22 +1,22 @@
-import warnings
-
-warnings.filterwarnings("ignore")
-
 import os
 import sys
 import warnings
-
-base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../")
-sys.path.append(base_dir)
 
 import matplotlib.pylab as plt
 import numpy as np
 import seaborn as sns
 from sklearn.metrics import pairwise_distances
 
-from experiments.Regularisation.correlated_linear_model import CorrelatedLinearModel
-from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
-from rkhs_shap.shapley_regulariser import ShapleyRegulariser
+warnings.filterwarnings("ignore")
+
+base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../")
+sys.path.append(base_dir)
+
+from experiments.Regularisation.correlated_linear_model import (  # noqa: E402
+    CorrelatedLinearModel,
+)
+from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx  # noqa: E402
+from rkhs_shap.shapley_regulariser import ShapleyRegulariser  # noqa: E402
 
 MYDIR = "experiments/Regularisation/results"
 CHECK_FOLDER = os.path.isdir(MYDIR)
@@ -41,9 +41,12 @@ X, y = clm_obj.X, clm_obj.y
 
 B_true = clm_obj.kernelSHAP(X)
 
-compute_mh = lambda X: np.array(
-    [np.median(pairwise_distances(X[:, [i]])) for i in range(X.shape[1])]
-)
+
+def compute_mh(X):
+    return np.array(
+        [np.median(pairwise_distances(X[:, [i]])) for i in range(X.shape[1])]
+    )
+
 
 BO_ls = []
 lambda_sv_ls = [0, 2, 5, 10, 20]

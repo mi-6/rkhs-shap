@@ -1,14 +1,15 @@
 import os.path
+import pickle
 
 import dill
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-from pref_shap import *
-from utils import *
+from pref_shap import construct_values
+from utils import RBF_multiple_ls, train_krr_simple
 
-from rkhs_shap import *
+from rkhs_shap import rkhs_shap
 
 sns.set()
 

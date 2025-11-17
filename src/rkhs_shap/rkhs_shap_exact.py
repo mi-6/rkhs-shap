@@ -7,7 +7,6 @@ from copy import deepcopy
 import numpy as np
 import torch
 from gpytorch.kernels import Kernel
-from numpy import sum
 from scipy.special import binom
 
 # from gpytorch.lazy import lazify

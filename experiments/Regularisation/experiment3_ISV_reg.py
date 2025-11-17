@@ -1,26 +1,25 @@
-import warnings
-
-warnings.filterwarnings("ignore")
-
 import copy
 import os
 import pickle
 import sys
 import warnings
 
+import numpy as np
 import torch
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import train_test_split
+
+warnings.filterwarnings("ignore")
 
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../")
 sys.path.append(base_dir)
 
-import numpy as np
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
-
-from experiments.Regularisation.correlated_linear_model import CorrelatedLinearModel
-from rkhs_shap.kernel_ridge_regression import KernelRidgeRegressor
-from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
-from rkhs_shap.shapley_regulariser import ShapleyRegulariser
+from experiments.Regularisation.correlated_linear_model import (  # noqa: E402
+    CorrelatedLinearModel,
+)
+from rkhs_shap.kernel_ridge_regression import KernelRidgeRegressor  # noqa: E402
+from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx  # noqa: E402
+from rkhs_shap.shapley_regulariser import ShapleyRegulariser  # noqa: E402
 
 
 def generate_simulation(n: int, m: int, beta: np.array):

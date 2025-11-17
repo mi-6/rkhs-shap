@@ -1,17 +1,17 @@
 # Implement SUPER FALKON with sparse kernel implementation!
 import copy
 
+import falkon
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
-plt.style.use("ggplot")
-import falkon
 import tqdm
 from falkon import FalkonOptions
 from falkon.hopt.objectives import NystromCompReg
 from falkon.kernels import DiffKernel, GaussianKernel
 from sklearn.metrics import roc_auc_score
+
+plt.style.use("ggplot")
 
 
 class NystromCompRegSHAP(NystromCompReg):
