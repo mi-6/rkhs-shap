@@ -51,16 +51,16 @@ class CorrelatedLinearModel(object):
 
         self.X, self.y = X, y
 
-    def _observational_value_function(self, z: list, X: np.array):
+    def _observational_value_function(self, z: np.ndarray, X: np.array):
         """[Compute Observational Value function evaluation]
 
         Args:
-            z (list): [subsetting]
+            z (np.ndarray): [subsetting]
             X (np.array): [the data]
         """
 
         # Subset
-        zc = z == False
+        zc = ~z
 
         # Mean 0 multivariate Gaussian
         reference = self.y.mean()

@@ -17,8 +17,8 @@ def test_generate_full_Z(m):
 
     assert Z.shape == (2**m, m)
     assert Z.dtype == bool
-    assert np.all(Z[0] == False)
-    assert np.all(Z[-1] == True)
+    assert np.all(~Z[0])
+    assert np.all(Z[-1])
 
     unique_rows = np.unique(Z, axis=0)
     assert len(unique_rows) == 2**m
@@ -31,8 +31,8 @@ def test_subset_full_Z(m, samples):
 
     assert Z_subset.shape == (samples + 2, m)
     assert Z_subset.dtype == bool
-    assert np.all(Z_subset[-2] == False) or np.all(Z_subset[-1] == False)
-    assert np.all(Z_subset[-2] == True) or np.all(Z_subset[-1] == True)
+    assert np.all(~Z_subset[-2]) or np.all(~Z_subset[-1])
+    assert np.all(Z_subset[-2]) or np.all(Z_subset[-1])
 
 
 @pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100), (8, 200)])
@@ -41,8 +41,8 @@ def test_large_scale_sample_alternative(m, n_samples):
 
     assert Z.shape == (n_samples + 2, m)
     assert Z.dtype == bool
-    assert np.all(Z[-2] == False)
-    assert np.all(Z[-1] == True)
+    assert np.all(~Z[-2])
+    assert np.all(Z[-1])
 
     coalition_sizes = Z[:-2].sum(axis=1)
     assert len(np.unique(coalition_sizes)) > 1
@@ -88,8 +88,8 @@ def test_generate_samples_Z(m, mcmc_run, warm_up_cut):
     assert Z.shape[0] == mcmc_run - warm_up_cut + 4
     assert Z.dtype == bool
 
-    assert np.all(Z[-2] == True)
-    assert np.all(Z[-1] == False)
+    assert np.all(Z[-2])
+    assert np.all(~Z[-1])
 
 
 def test_generate_samples_Z_warmup():

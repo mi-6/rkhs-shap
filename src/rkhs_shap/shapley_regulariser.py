@@ -62,7 +62,7 @@ class ShapleyRegulariser(object):
         Compute the interventional embedding
         """
 
-        zc = z == False
+        zc = ~z
         n, m = X.shape
 
         if z.sum() == m:
@@ -85,7 +85,7 @@ class ShapleyRegulariser(object):
         Compute the observational embedding
         """
 
-        zc = z == False
+        zc = ~z
         n, m = X.shape
 
         if z.sum() == 0:

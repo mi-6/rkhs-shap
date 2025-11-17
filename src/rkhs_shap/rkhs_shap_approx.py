@@ -98,7 +98,7 @@ class RKHSSHAP_Approx(object):
         """
 
         n_ = X_new.shape[0]
-        zc = z == False
+        zc = ~z
 
         # compute the reference value - using previously trained data
         reference = (self.ypred.mean() * torch.ones((1, n_))).float()
@@ -139,7 +139,7 @@ class RKHSSHAP_Approx(object):
         :param X_new:
         :return:
         """
-        zc = z == False
+        zc = ~z
         n_ = X_new.shape[0]
 
         # compute the reference value - using previously trained data
