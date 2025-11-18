@@ -9,8 +9,14 @@ import torch
 from rkhs_shap.examples.exact_gp import ExactGPModel
 from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
 
+from .conftest import (
+    calculate_additivity_mae,
+    calculate_correlation,
+    get_train_subset,
+    train_gp_model,
+)
+
 # Test configuration constants
-N_TRAIN_SAMPLES = 100
 N_EXPLAIN_SAMPLES = 10
 CME_REGULARIZATION = 1e-4
 N_COMPONENTS = 50
@@ -21,95 +27,17 @@ MIN_INTERVENTIONAL_CORRELATION = 0.90
 DEFAULT_MIN_OBSERVATIONAL_CORRELATION = 0.75
 
 
-def calculate_additivity_mae(
-    shap_values: np.ndarray, model_preds: torch.Tensor, baseline: float
-) -> float:
-    """
-    Calculate the mean absolute error of the additivity property.
-
-    The additivity property states that sum of SHAP values plus baseline
-    should equal the model prediction: baseline + sum(shap_values) = f(x)
-
-    Args:
-        shap_values: Array of SHAP values (n_samples, n_features)
-        model_preds: Model predictions for each sample
-        baseline: Baseline prediction (usually mean of training predictions)
-
-    Returns:
-        float: Mean absolute additivity error
-    """
-    shap_sums = shap_values.sum(axis=1)
-    pred_diffs = model_preds.numpy() - baseline
-    return np.mean(np.abs(shap_sums - pred_diffs))
-
-
-def calculate_correlation(values1: np.ndarray, values2: np.ndarray) -> float:
-    """
-    Calculate mean correlation between two sets of SHAP values.
-
-    Args:
-        values1: First set of SHAP values (n_samples, n_features)
-        values2: Second set of SHAP values (n_samples, n_features)
-
-    Returns:
-        float: Mean correlation across all samples
-    """
-    correlations = []
-    for i in range(values1.shape[0]):
-        corr = np.corrcoef(values1[i], values2[i])[0, 1]
-        if not np.isnan(corr):
-            correlations.append(corr)
-    return np.mean(correlations)
-
-
-@pytest.fixture
-def diabetes_data() -> tuple[np.ndarray, np.ndarray]:
-    """Load and preprocess the diabetes dataset from SHAP."""
-    X, y = shap.datasets.diabetes()
-    X = np.array(X, dtype=np.float32)
-    y = np.array(y, dtype=np.float32)
-
-    # Normalize X to [0, 1] range
-    X_min, X_max = X.min(axis=0), X.max(axis=0)
-    X = (X - X_min) / (X_max - X_min + 1e-8)
-
-    # Standardize y (zero mean, unit variance)
-    y_mean, y_std = y.mean(), y.std()
-    y = (y - y_mean) / y_std
-
-    return X, y
-
-
-def train_gp_model(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    covar_module: gpytorch.kernels.Kernel | None = None,
-) -> tuple[ExactGPModel, torch.Tensor, torch.Tensor]:
-    """Helper function to train a GP model."""
-    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-    y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
-    gp = ExactGPModel(X_train_tensor, y_train_tensor, covar_module=covar_module)
-    gp.fit()
-    return gp, X_train_tensor, y_train_tensor
-
-
-def _get_train_subset(diabetes_data) -> tuple[np.ndarray, np.ndarray]:
-    """Extract training subset from diabetes data."""
-    X, y = diabetes_data
-    return X[:N_TRAIN_SAMPLES], y[:N_TRAIN_SAMPLES]
-
-
 @pytest.fixture
 def trained_model(diabetes_data):
     """Train a GP model with RBF kernel on the diabetes dataset."""
-    X_train, y_train = _get_train_subset(diabetes_data)
+    X_train, y_train = get_train_subset(diabetes_data)
     return train_gp_model(X_train, y_train)
 
 
 @pytest.fixture
 def trained_model_matern(diabetes_data):
     """Train a GP model with Matern kernel on the diabetes dataset."""
-    X_train, y_train = _get_train_subset(diabetes_data)
+    X_train, y_train = get_train_subset(diabetes_data)
     matern_kernel = gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=X_train.shape[1])
     return train_gp_model(X_train, y_train, covar_module=matern_kernel)
 
@@ -117,7 +45,7 @@ def trained_model_matern(diabetes_data):
 @pytest.fixture
 def trained_model_scaled(diabetes_data):
     """Train a GP model with ScaleKernel + RBF kernel on the diabetes dataset."""
-    X_train, y_train = _get_train_subset(diabetes_data)
+    X_train, y_train = get_train_subset(diabetes_data)
     scaled_kernel = gpytorch.kernels.ScaleKernel(
         gpytorch.kernels.RBFKernel(ard_num_dims=X_train.shape[1])
     )

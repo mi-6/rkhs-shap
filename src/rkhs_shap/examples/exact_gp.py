@@ -63,7 +63,6 @@ class ExactGPModel(gpytorch.models.ExactGP):
                         self.likelihood.noise.detach(),
                     )
                 )
-                # print(f"Lengthscale: {self.covar_module.lengthscale.detach()}")
             optimizer.step()
 
         self.eval()
