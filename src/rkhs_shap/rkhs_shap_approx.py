@@ -57,20 +57,8 @@ class RKHSSHAP_Approx(object):
         self.kernel = deepcopy(kernel)
         freeze_parameters(self.kernel)
 
-        # Extract lengthscale for Nyström approximation
-        # TODO: Refactor Nystroem_gpytorch to work directly with kernel
-        lengthscale = self._extract_lengthscale(self.kernel)
-        if lengthscale is None:
-            lengthscale = np.ones(self.m)
-        else:
-            lengthscale = lengthscale.reshape(-1)
-            if lengthscale.size == 1:
-                lengthscale = np.ones(self.m) * lengthscale[0]
-
         # Run Nyström approximation and Kernel Ridge Regression
-        self.nystroem = Nystroem_gpytorch(
-            kernel=self.kernel, lengthscale=lengthscale, n_components=n_components
-        )
+        self.nystroem = Nystroem_gpytorch(kernel=self.kernel, n_components=n_components)
         self.nystroem.fit(self.X.numpy())
         Z = self.nystroem.transform(self.X.numpy())
         K_train = Z @ Z.T
@@ -86,15 +74,6 @@ class RKHSSHAP_Approx(object):
         ).item()
         self.reference = self.ypred.mean().item()
         self.Z = Z
-
-    def _extract_lengthscale(self, kernel: Kernel) -> np.ndarray | None:
-        """Recursively extract lengthscale from kernel, handling nested kernels like ScaleKernel."""
-        if hasattr(kernel, "lengthscale") and kernel.lengthscale is not None:
-            return kernel.lengthscale.detach().cpu().numpy()
-        elif hasattr(kernel, "base_kernel"):
-            return self._extract_lengthscale(kernel.base_kernel)
-        else:
-            return None
 
     def _value_intervention(self, z: np.ndarray, X_test: np.ndarray) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
@@ -147,22 +126,17 @@ class RKHSSHAP_Approx(object):
         """Apply Nyström transformation with a subset kernel.
 
         Note: SubsetKernel handles the subsetting internally, so we pass full-dimensional
-        data but scaled appropriately.
+        data and let the kernel handle feature selection.
         """
-        # Scale data by Nyström lengthscales (full dimensional)
-        X_scaled = X / self.nystroem.ls
-        X_tensor = torch.tensor(X_scaled).float()
-
-        # Scale landmarks (full dimensional)
-        landmarks_tensor = torch.tensor(self.nystroem.landmarks).float()
+        X_tensor = torch.tensor(X, dtype=torch.float32)
 
         # Apply Nyström transformation with subset kernel
         # SubsetKernel will internally select the active dimensions
         ZT = (
-            subset_kernel(landmarks_tensor)
+            subset_kernel(self.nystroem.landmarks)
             .add_jitter()
             .cholesky()
-            .inv_matmul(subset_kernel(landmarks_tensor, X_tensor).evaluate())
+            .inv_matmul(subset_kernel(self.nystroem.landmarks, X_tensor).evaluate())
         )
 
         return ZT.T
