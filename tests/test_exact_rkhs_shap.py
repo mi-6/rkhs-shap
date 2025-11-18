@@ -1,5 +1,6 @@
 """Tests for exact RKHS-SHAP implementation."""
 
+import gpytorch
 import numpy as np
 import pytest
 import shap
@@ -7,6 +8,16 @@ import torch
 
 from rkhs_shap.examples.exact_gp import ExactGPModel
 from rkhs_shap.rkhs_shap_exact import RKHSSHAP
+
+# Test configuration constants
+N_TRAIN_SAMPLES = 100
+N_EXPLAIN_SAMPLES = 10
+CME_REGULARIZATION = 1e-4
+
+# Assertion thresholds
+MAX_ADDITIVITY_MAE = 0.005
+MIN_INTERVENTIONAL_CORRELATION = 0.99
+DEFAULT_MIN_OBSERVATIONAL_CORRELATION = 0.85
 
 
 def calculate_additivity_mae(
@@ -26,17 +37,32 @@ def calculate_additivity_mae(
     Returns:
         float: Mean absolute additivity error
     """
-    additivity_errors = []
-    for i in range(shap_values.shape[0]):
-        shap_sum = shap_values[i].sum()
-        pred_diff = model_preds[i].item() - baseline
-        error = abs(shap_sum - pred_diff)
-        additivity_errors.append(error)
-    return np.mean(additivity_errors)
+    shap_sums = shap_values.sum(axis=1)
+    pred_diffs = model_preds.numpy() - baseline
+    return np.mean(np.abs(shap_sums - pred_diffs))
+
+
+def calculate_correlation(values1: np.ndarray, values2: np.ndarray) -> float:
+    """
+    Calculate mean correlation between two sets of SHAP values.
+
+    Args:
+        values1: First set of SHAP values (n_samples, n_features)
+        values2: Second set of SHAP values (n_samples, n_features)
+
+    Returns:
+        float: Mean correlation across all samples
+    """
+    correlations = []
+    for i in range(values1.shape[0]):
+        corr = np.corrcoef(values1[i], values2[i])[0, 1]
+        if not np.isnan(corr):
+            correlations.append(corr)
+    return np.mean(correlations)
 
 
 @pytest.fixture
-def diabetes_data():
+def diabetes_data() -> tuple[np.ndarray, np.ndarray]:
     """Load and preprocess the diabetes dataset from SHAP."""
     X, y = shap.datasets.diabetes()
     X = np.array(X, dtype=np.float32)
@@ -53,27 +79,56 @@ def diabetes_data():
     return X, y
 
 
-@pytest.fixture
-def trained_model(diabetes_data):
-    """Train a GP model on the diabetes dataset."""
-    X, y = diabetes_data
-
-    # Use a subset for faster testing
-    X_train = X[:100]
-    y_train = y[:100]
-
+def train_gp_model(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    covar_module: gpytorch.kernels.Kernel | None = None,
+) -> tuple[ExactGPModel, torch.Tensor, torch.Tensor]:
+    """Helper function to train a GP model."""
     X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
     y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
-
-    gp = ExactGPModel(X_train_tensor, y_train_tensor)
+    gp = ExactGPModel(X_train_tensor, y_train_tensor, covar_module=covar_module)
     gp.fit()
-
     return gp, X_train_tensor, y_train_tensor
 
 
-def test_exact_rkhs_shap_diabetes(trained_model):
+def _get_train_subset(diabetes_data) -> tuple[np.ndarray, np.ndarray]:
+    """Extract training subset from diabetes data."""
+    X, y = diabetes_data
+    return X[:N_TRAIN_SAMPLES], y[:N_TRAIN_SAMPLES]
+
+
+@pytest.fixture
+def trained_model(diabetes_data):
+    """Train a GP model with RBF kernel on the diabetes dataset."""
+    X_train, y_train = _get_train_subset(diabetes_data)
+    return train_gp_model(X_train, y_train)
+
+
+@pytest.fixture
+def trained_model_matern(diabetes_data):
+    """Train a GP model with Matern kernel on the diabetes dataset."""
+    X_train, y_train = _get_train_subset(diabetes_data)
+    matern_kernel = gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=X_train.shape[1])
+    return train_gp_model(X_train, y_train, covar_module=matern_kernel)
+
+
+@pytest.fixture
+def trained_model_scaled(diabetes_data):
+    """Train a GP model with ScaleKernel + RBF kernel on the diabetes dataset."""
+    X_train, y_train = _get_train_subset(diabetes_data)
+    scaled_kernel = gpytorch.kernels.ScaleKernel(
+        gpytorch.kernels.RBFKernel(ard_num_dims=X_train.shape[1])
+    )
+    return train_gp_model(X_train, y_train, covar_module=scaled_kernel)
+
+
+def run_rkhs_shap_test(
+    trained_model: tuple[ExactGPModel, torch.Tensor, torch.Tensor],
+    min_corr_O: float = DEFAULT_MIN_OBSERVATIONAL_CORRELATION,
+) -> None:
     """
-    Test exact RKHS-SHAP on the diabetes dataset and compare with KernelSHAP.
+    Helper function to run RKHS-SHAP test on a trained model.
 
     This test verifies:
     1. RKHS-SHAP runs successfully on real data
@@ -84,13 +139,11 @@ def test_exact_rkhs_shap_diabetes(trained_model):
     np.random.seed(42)
     torch.manual_seed(42)
 
-    gp: ExactGPModel
-    X_train: torch.Tensor
-    y_train: torch.Tensor
     gp, X_train, y_train = trained_model
+    kernel_name = gp.covar_module.__class__.__name__
 
     lambda_krr = gp.likelihood.noise.detach().cpu().float()
-    lambda_cme = torch.tensor(1e-4).float()
+    lambda_cme = torch.tensor(CME_REGULARIZATION).float()
 
     rkhs_shap = RKHSSHAP(
         X=X_train,
@@ -100,31 +153,26 @@ def test_exact_rkhs_shap_diabetes(trained_model):
         cme_reg=lambda_cme,
     )
 
-    n_explain = 10
-    X_explain = X_train[:n_explain]
+    X_explain = X_train[:N_EXPLAIN_SAMPLES]
 
-    # Compute Interventional RKHS-SHAP
     shap_values_I = rkhs_shap.fit(
         X_test=X_explain,
-        method="I",  # Interventional
+        method="I",
         sample_method="full",
     )
 
-    # Compute Observational RKHS-SHAP
     shap_values_O = rkhs_shap.fit(
         X_test=X_explain,
-        method="O",  # Observational
+        method="O",
         sample_method="full",
     )
 
-    # Get model predictions and baseline for additivity test
     model_preds = gp.predict(X_explain).mean
     baseline = gp.predict(X_train).mean.mean().item()
 
     additivity_mae_I = calculate_additivity_mae(shap_values_I, model_preds, baseline)
     additivity_mae_O = calculate_additivity_mae(shap_values_O, model_preds, baseline)
 
-    # Run KernelSHAP for comparison
     explainer = shap.KernelExplainer(gp.predict_mean_numpy, X_train.numpy())
     kernel_explanation = explainer(X_explain.numpy())
     kernel_values = kernel_explanation.values
@@ -132,63 +180,57 @@ def test_exact_rkhs_shap_diabetes(trained_model):
         kernel_values, model_preds, baseline
     )
 
-    # Normalize MAEs by prediction range for better interpretability
     pred_range = (model_preds.max() - model_preds.min()).item()
     additivity_mae_I = additivity_mae_I / pred_range
     additivity_mae_O = additivity_mae_O / pred_range
     kernel_additivity_mae = kernel_additivity_mae / pred_range
-    print(f"\nRKHS-SHAP Interventional additivity MAE: {additivity_mae_I:.6f}")
+
+    mean_corr_I = calculate_correlation(kernel_values, shap_values_I)
+    mean_corr_O = calculate_correlation(kernel_values, shap_values_O)
+
+    print(f"\n{kernel_name} Kernel Test Results:")
+    print(f"RKHS-SHAP Interventional additivity MAE: {additivity_mae_I:.6f}")
     print(f"RKHS-SHAP Observational additivity MAE: {additivity_mae_O:.6f}")
     print(f"KernelSHAP additivity MAE: {kernel_additivity_mae:.6f}")
-
-    corr_I = []
-    corr_O = []
-
-    for i in range(n_explain):
-        corr_i = np.corrcoef(kernel_values[i], shap_values_I[i])[0, 1]
-        if not np.isnan(corr_i):
-            corr_I.append(corr_i)
-
-        corr_o = np.corrcoef(kernel_values[i], shap_values_O[i])[0, 1]
-        if not np.isnan(corr_o):
-            corr_O.append(corr_o)
-
-    mean_corr_I = np.mean(corr_I)
-    mean_corr_O = np.mean(corr_O)
-
     print("\nCorrelation with KernelSHAP:")
     print(f"  Interventional: {mean_corr_I:.3f}")
     print(f"  Observational: {mean_corr_O:.3f}")
 
-    # Assertions
-    # 1. SHAP values should have correct shape
-    assert shap_values_I.shape == (n_explain, X_train.shape[1])
-    assert shap_values_O.shape == (n_explain, X_train.shape[1])
+    assert shap_values_I.shape == (N_EXPLAIN_SAMPLES, X_train.shape[1])
+    assert shap_values_O.shape == (N_EXPLAIN_SAMPLES, X_train.shape[1])
 
-    # 2. Additivity error should be reasonably small (within 10% of prediction range)
-    assert additivity_mae_I < 0.005, (
+    assert additivity_mae_I < MAX_ADDITIVITY_MAE, (
         f"Interventional additivity error too large: {additivity_mae_I}"
     )
-    assert additivity_mae_O < 0.005, (
+    assert additivity_mae_O < MAX_ADDITIVITY_MAE, (
         f"Observational additivity error too large: {additivity_mae_O}"
     )
 
-    # 3. Correlation with KernelSHAP should be high
-    assert mean_corr_I > 0.99, (
+    assert mean_corr_I > MIN_INTERVENTIONAL_CORRELATION, (
         f"Interventional correlation with KernelSHAP too low: {mean_corr_I}"
     )
-    assert mean_corr_O > 0.85, (
+    assert mean_corr_O > min_corr_O, (
         f"Observational correlation with KernelSHAP too low: {mean_corr_O}"
     )
 
     print("\n" + "=" * 60)
-    print("Test passed! Summary:")
-    print(f"  RKHS-SHAP Interventional additivity MAE: {additivity_mae_I:.6f}")
-    print(f"  RKHS-SHAP Observational additivity MAE:  {additivity_mae_O:.6f}")
-    print(f"  KernelSHAP additivity MAE:                {kernel_additivity_mae:.6f}")
-    print(f"  Correlation with KernelSHAP (I):          {mean_corr_I:.3f}")
-    print(f"  Correlation with KernelSHAP (O):          {mean_corr_O:.3f}")
+    print(f"{kernel_name} Kernel test passed!")
     print("=" * 60)
+
+
+def test_exact_rkhs_shap_diabetes(trained_model):
+    """Test exact RKHS-SHAP with RBF kernel on the diabetes dataset."""
+    run_rkhs_shap_test(trained_model)
+
+
+def test_exact_rkhs_shap_diabetes_matern(trained_model_matern):
+    """Test exact RKHS-SHAP with Matern kernel on the diabetes dataset."""
+    run_rkhs_shap_test(trained_model_matern, min_corr_O=0.83)
+
+
+def test_exact_rkhs_shap_diabetes_scaled(trained_model_scaled):
+    """Test exact RKHS-SHAP with ScaleKernel + RBF kernel on the diabetes dataset."""
+    run_rkhs_shap_test(trained_model_scaled, min_corr_O=0.83)
 
 
 if __name__ == "__main__":
