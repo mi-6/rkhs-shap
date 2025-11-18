@@ -1,5 +1,3 @@
-from typing import Optional
-
 import gpytorch
 import numpy as np
 import torch
@@ -10,8 +8,8 @@ class ExactGPModel(gpytorch.models.ExactGP):
         self,
         train_x: torch.Tensor,
         train_y: torch.Tensor,
-        likelihood: Optional[gpytorch.likelihoods.GaussianLikelihood] = None,
-        covar_module: Optional[gpytorch.kernels.Kernel] = None,
+        likelihood: gpytorch.likelihoods.GaussianLikelihood | None = None,
+        covar_module: gpytorch.kernels.Kernel | None = None,
     ) -> None:
         if likelihood is None:
             likelihood = gpytorch.likelihoods.GaussianLikelihood()
@@ -65,7 +63,6 @@ class ExactGPModel(gpytorch.models.ExactGP):
                         self.likelihood.noise.detach(),
                     )
                 )
-                # print(f"Lengthscale: {self.covar_module.lengthscale.detach()}")
             optimizer.step()
 
         self.eval()

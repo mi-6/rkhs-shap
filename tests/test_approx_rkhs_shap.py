@@ -1,4 +1,4 @@
-"""Tests for exact RKHS-SHAP implementation."""
+"""Tests for approximate RKHS-SHAP implementation with Nyström approximation."""
 
 import gpytorch
 import numpy as np
@@ -7,7 +7,7 @@ import shap
 import torch
 
 from rkhs_shap.examples.exact_gp import ExactGPModel
-from rkhs_shap.rkhs_shap_exact import RKHSSHAP
+from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
 
 from .conftest import (
     calculate_additivity_mae,
@@ -19,11 +19,12 @@ from .conftest import (
 # Test configuration constants
 N_EXPLAIN_SAMPLES = 10
 CME_REGULARIZATION = 1e-4
+N_COMPONENTS = 50
 
-# Assertion thresholds
-MAX_ADDITIVITY_MAE = 0.005
-MIN_INTERVENTIONAL_CORRELATION = 0.99
-DEFAULT_MIN_OBSERVATIONAL_CORRELATION = 0.85
+# Assertion thresholds (more lenient for approximate method with Nyström)
+MAX_ADDITIVITY_MAE = 0.10  # Nyström approximation has lower accuracy
+MIN_INTERVENTIONAL_CORRELATION = 0.90
+DEFAULT_MIN_OBSERVATIONAL_CORRELATION = 0.75
 
 
 @pytest.fixture
@@ -59,7 +60,7 @@ def run_rkhs_shap_test(
     Helper function to run RKHS-SHAP test on a trained model.
 
     This test verifies:
-    1. RKHS-SHAP runs successfully on real data
+    1. RKHS-SHAP runs successfully on real data with Nyström approximation
     2. Additivity property is satisfied (MAE is low)
     3. Results are correlated with KernelSHAP
     4. RKHS-SHAP additivity is comparable or better than KernelSHAP
@@ -73,12 +74,13 @@ def run_rkhs_shap_test(
     lambda_krr = gp.likelihood.noise.detach().cpu().float()
     lambda_cme = torch.tensor(CME_REGULARIZATION).float()
 
-    rkhs_shap = RKHSSHAP(
+    rkhs_shap = RKHSSHAP_Approx(
         X=X_train,
         y=y_train,
         kernel=gp.covar_module,
         noise_var=lambda_krr,
         cme_reg=lambda_cme,
+        n_components=N_COMPONENTS,
     )
 
     X_explain = X_train[:N_EXPLAIN_SAMPLES]
@@ -116,7 +118,7 @@ def run_rkhs_shap_test(
     mean_corr_I = calculate_correlation(kernel_values, shap_values_I)
     mean_corr_O = calculate_correlation(kernel_values, shap_values_O)
 
-    print(f"\n{kernel_name} Kernel Test Results:")
+    print(f"\n{kernel_name} Kernel Test Results (Approximate with Nyström):")
     print(f"RKHS-SHAP Interventional additivity MAE: {additivity_mae_I:.6f}")
     print(f"RKHS-SHAP Observational additivity MAE: {additivity_mae_O:.6f}")
     print(f"KernelSHAP additivity MAE: {kernel_additivity_mae:.6f}")
@@ -142,23 +144,56 @@ def run_rkhs_shap_test(
     )
 
     print("\n" + "=" * 60)
-    print(f"{kernel_name} Kernel test passed!")
+    print(f"{kernel_name} Kernel test passed (Approximate)!")
     print("=" * 60)
 
 
-def test_exact_rkhs_shap_diabetes(trained_model):
-    """Test exact RKHS-SHAP with RBF kernel on the diabetes dataset."""
+def test_approx_rkhs_shap_diabetes(trained_model):
+    """Test approximate RKHS-SHAP with RBF kernel on the diabetes dataset."""
     run_rkhs_shap_test(trained_model)
 
 
-def test_exact_rkhs_shap_diabetes_matern(trained_model_matern):
-    """Test exact RKHS-SHAP with Matern kernel on the diabetes dataset."""
-    run_rkhs_shap_test(trained_model_matern, min_corr_O=0.83)
+def test_approx_rkhs_shap_diabetes_matern(trained_model_matern):
+    """Test approximate RKHS-SHAP with Matern kernel on the diabetes dataset."""
+    run_rkhs_shap_test(trained_model_matern, min_corr_O=0.75)
 
 
-def test_exact_rkhs_shap_diabetes_scaled(trained_model_scaled):
-    """Test exact RKHS-SHAP with ScaleKernel + RBF kernel on the diabetes dataset."""
-    run_rkhs_shap_test(trained_model_scaled, min_corr_O=0.83)
+def test_approx_rkhs_shap_diabetes_scaled(trained_model_scaled):
+    """Test approximate RKHS-SHAP with ScaleKernel + RBF kernel on the diabetes dataset."""
+    run_rkhs_shap_test(trained_model_scaled, min_corr_O=0.75)
+
+
+def test_approx_accepts_tensor_and_array(trained_model):
+    """Test that approximate RKHS-SHAP accepts both Tensor and ndarray inputs."""
+    gp, X_train, y_train = trained_model
+
+    rkhs_shap = RKHSSHAP_Approx(
+        X=X_train,
+        y=y_train,
+        kernel=gp.covar_module,
+        noise_var=gp.likelihood.noise.detach().cpu().float(),
+        cme_reg=CME_REGULARIZATION,
+        n_components=N_COMPONENTS,
+    )
+
+    X_explain = X_train[:5]
+
+    # Test with Tensor
+    shap_values_tensor = rkhs_shap.fit(
+        X_test=X_explain,
+        method="I",
+        sample_method="full",
+    )
+
+    # Test with ndarray
+    shap_values_array = rkhs_shap.fit(
+        X_test=X_explain.numpy(),
+        method="I",
+        sample_method="full",
+    )
+
+    # Results should be the same
+    np.testing.assert_allclose(shap_values_tensor, shap_values_array, rtol=1e-5)
 
 
 if __name__ == "__main__":

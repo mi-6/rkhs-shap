@@ -1,56 +1,70 @@
 import numpy as np
 import torch
+from gpytorch.kernels import Kernel
 from sklearn.cluster import KMeans
+from torch import Tensor
 
 
 class Nystroem_gpytorch(object):
-    """[summary]
+    """Nyström approximation for GPyTorch kernels.
 
-    Fit and run the nystroem approximation for large scale kernel operation
-
+    Uses KMeans to select landmark points, then approximates kernel matrices
+    using the Nyström method: K ≈ K_nm @ K_mm^{-1} @ K_mn where m are landmarks.
     """
 
-    def __init__(self, kernel, lengthscale, n_components):
-        """
+    def __init__(self, kernel: Kernel, n_components: int) -> None:
+        """Initialize Nyström approximation.
 
-        :param kernel: gpytorch basekernel
-        :param lengthscale: lengthscale of the kernel
-        :param n_componenets:
+        Args:
+            kernel: GPyTorch kernel (already fitted with appropriate lengthscale)
+            n_components: Number of landmark points for approximation
         """
-
-        self.ls = lengthscale
-        self.n_components = n_components
-        self.fitted = None
         self.kernel = kernel
+        self.n_components = n_components
+        self.landmarks = None
 
-    def fit(self, X):
-        X = X / self.ls
+    def fit(self, X: np.ndarray) -> None:
+        """Fit landmark points using KMeans clustering.
 
-        km = KMeans(n_clusters=self.n_components)
+        Args:
+            X: Training data of shape (n, m)
+        """
+        km = KMeans(n_clusters=self.n_components, random_state=0)
         km.fit(X)
+        self.landmarks = torch.tensor(km.cluster_centers_, dtype=torch.float32)
 
-        self.landmarks = km.cluster_centers_
+    def transform(self, X: np.ndarray) -> Tensor:
+        """Transform data using Nyström approximation.
 
-    def transform(self, X, active_dims=None):
-        if active_dims is None:
-            active_dims = np.array([True for i in range(X.shape[1])])
+        Args:
+            X: Data to transform of shape (n, m)
 
-        X = X / self.ls
+        Returns:
+            Transformed features of shape (n, n_components)
+        """
+        if self.landmarks is None:
+            raise ValueError("Must call fit() before transform()")
 
-        sub_X = torch.tensor(X[:, active_dims]).float()
+        X_tensor = torch.tensor(X, dtype=torch.float32)
 
-        sub_landmarks = torch.tensor(self.landmarks[:, active_dims]).float()
-
+        # Compute K_mm^{-1/2} @ K_mn
         ZT = (
-            self.kernel(sub_landmarks)
+            self.kernel(self.landmarks)
             .add_jitter()
             .cholesky()
-            .inv_matmul(self.kernel(sub_landmarks, sub_X).evaluate())
+            .inv_matmul(self.kernel(self.landmarks, X_tensor).evaluate())
         )
 
-        # return (ZT.T).detach().numpy()
         return ZT.T
 
-    def compute_kernel(self, X, active_dims=None):
-        Z = self.transform(X=X, active_dims=active_dims)
+    def compute_kernel(self, X: np.ndarray) -> Tensor:
+        """Compute approximated kernel matrix.
+
+        Args:
+            X: Data of shape (n, m)
+
+        Returns:
+            Approximated kernel matrix K ≈ Z @ Z.T of shape (n, n)
+        """
+        Z = self.transform(X)
         return Z @ Z.T
