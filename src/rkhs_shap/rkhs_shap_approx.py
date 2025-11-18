@@ -2,13 +2,15 @@
 # KernelSHAP4K For Regression #
 ###############################
 
+from copy import deepcopy
+
 import numpy as np
 import torch
-from gpytorch.kernels import RBFKernel
+from gpytorch.kernels import Kernel
 from gpytorch.lazy import lazify
-from numpy import sum
 from scipy.special import binom
 from sklearn.linear_model import Ridge
+from torch import Tensor
 from tqdm import tqdm
 
 from rkhs_shap.kernel_approx import Nystroem_gpytorch
@@ -17,188 +19,218 @@ from rkhs_shap.sampling import (
     large_scale_sample_alternative,
     subset_full_Z,
 )
+from rkhs_shap.subset_kernel import SubsetKernel
+from rkhs_shap.utils import freeze_parameters
 
 
 class RKHSSHAP_Approx(object):
-    """
-    Instantiate this class to run the RKHS-SHAP algorithm. Nystroem approximation is used by default.
-    """
+    """Implement the RKHS SHAP algorithm with Nyström kernel approximation"""
 
     def __init__(
         self,
-        X: np.array,
-        y: np.array,
-        lambda_krr: float = 1e-2,
-        lambda_cme: float = 1e-3,
-        lengthscale: np.array = None,
+        X: Tensor,
+        y: Tensor,
+        kernel: Kernel,
+        noise_var: float = 1e-2,
+        cme_reg: float = 1e-3,
         n_components: int = 100,
-    ):
-        """[summary]
+    ) -> None:
+        """Initialize approximate RKHS-SHAP with Nyström-approximated Kernel Ridge Regression.
 
         Args:
-            X (np.array): [training instances]
-            y (np.array): [training label]
-            lambda_krr (float, optional): [regularisation for kernel ridge regression]. Defaults to 1e-2.
-            lambda_cme (float, optional): [regularisation for conditional mean embedding]. Defaults to 1e-3.
-            lengthscale (np.array, optional): [lengthscale for kernel]. Defaults to None.
-            n_components (int, optional): [number of landmark points for kernel approximation]. Defaults to 100.
-
+            X: Training features of shape (n, m)
+            y: Training targets of shape (n,) or (n, 1)
+            kernel: Fitted kernel (e.g., RBFKernel, MaternKernel)
+            noise_var: KRR regularization parameter. Corresponds to the noise variance
+                in Gaussian Process formulation. If you've fit a GP model, set this to
+                model.likelihood.noise_covar.noise for equivalent predictions.
+            cme_reg: Regularization for conditional/marginal mean embeddings
+            n_components: Number of landmark points for Nyström approximation
         """
-
-        # Storing init data
         self.n, self.m = X.shape
-        self.X = X
-        self.X_scaled = X / lengthscale
-        self.ls = lengthscale
-        self.y = y
+        self.X, self.y = X.float(), y
 
-        self.lambda_cme = lambda_cme
-        self.lambda_krr = lambda_krr
-        self.num_components = n_components
+        noise_var = torch.tensor(noise_var, dtype=torch.float32)
+        cme_reg = torch.tensor(cme_reg, dtype=torch.float32)
+        self.cme_reg = cme_reg
 
-        # Set up kernel
-        rbf = RBFKernel()
-        rbf.raw_lengthscale.requires_grad = False
+        self.kernel = deepcopy(kernel)
+        freeze_parameters(self.kernel)
 
-        # Run Kernel Ridge Regression
-        if n_components is None:
-            raise ValueError("Input number of landmark points")
+        # Extract lengthscale for Nyström approximation
+        # TODO: Refactor Nystroem_gpytorch to work directly with kernel
+        lengthscale = self._extract_lengthscale(self.kernel)
+        if lengthscale is None:
+            lengthscale = np.ones(self.m)
+        else:
+            lengthscale = lengthscale.reshape(-1)
+            if lengthscale.size == 1:
+                lengthscale = np.ones(self.m) * lengthscale[0]
 
-        ny = Nystroem_gpytorch(
-            kernel=rbf, lengthscale=self.ls, n_components=n_components
+        # Run Nyström approximation and Kernel Ridge Regression
+        self.nystroem = Nystroem_gpytorch(
+            kernel=self.kernel, lengthscale=lengthscale, n_components=n_components
         )
-        ny.fit(self.X)
-        Z = ny.transform(self.X)
-        Kx = Z @ Z.T
+        self.nystroem.fit(self.X.numpy())
+        Z = self.nystroem.transform(self.X.numpy())
+        K_train = Z @ Z.T
 
-        alphas = (
-            lazify(Kx)
-            .add_diag(torch.tensor(self.lambda_krr))
-            .inv_matmul(torch.tensor(y.reshape(-1, 1)).float())
+        krr_weights: Tensor = (
+            lazify(K_train).add_diag(noise_var).inv_matmul(self.y.reshape(-1, 1))
         )
 
-        self.ypred = Kx @ alphas
-        self.y_ten = torch.tensor(y).reshape(-1, 1).float()
-        self.rmse = torch.sqrt(torch.mean((self.ypred - self.y_ten) ** 2))
-
-        # Store alphas and nystroem object
+        self.krr_weights = krr_weights.reshape(-1, 1)
+        self.ypred = K_train @ krr_weights
+        self.rmse = torch.sqrt(
+            torch.mean((self.ypred - self.y.reshape(-1, 1)) ** 2)
+        ).item()
+        self.reference = self.ypred.mean().item()
         self.Z = Z
-        self.alphas = alphas
-        self.nystroem = ny
-        self.Kx = Kx
 
-    def _value_intervention(self, z, X_new: np.array, substract_ref=True):
+    def _extract_lengthscale(self, kernel: Kernel) -> np.ndarray | None:
+        """Recursively extract lengthscale from kernel, handling nested kernels like ScaleKernel."""
+        if hasattr(kernel, "lengthscale") and kernel.lengthscale is not None:
+            return kernel.lengthscale.detach().cpu().numpy()
+        elif hasattr(kernel, "base_kernel"):
+            return self._extract_lengthscale(kernel.base_kernel)
+        else:
+            return None
+
+    def _value_intervention(self, z: np.ndarray, X_test: np.ndarray) -> Tensor:
+        """Compute interventional Shapley value function for coalition z.
+
+        Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
+        Uses Kernel Mean Embedding (KME) to marginalize over complement features.
+
+        Args:
+            z: Binary coalition vector of shape (m,) indicating active features
+            X_test: Test points of shape (n_test, m)
+
+        Returns:
+            Value function evaluated at X_test, shape (1, n_test)
         """
-        Compute the marginal expectation of E_zc[f(X_new)]
+        n_test = X_test.shape[0]
 
-        :param z: giving you the index for subsetting
-        :param X_new: evaluating at these new points (could be old points)
-
-        :return: marginal expectation of E_zc[f(X_new)]
-        """
-
-        n_ = X_new.shape[0]
-        zc = ~z
-
-        # compute the reference value - using previously trained data
-        reference = (self.ypred.mean() * torch.ones((1, n_))).float()
-        self.reference = reference
+        if z.sum() == 0:
+            return 0
 
         if z.sum() == self.m:
-            new_ypred = self.alphas.T @ self.Z @ self.nystroem.transform(X_new).T
-            if substract_ref:
-                return new_ypred - reference
-            else:
-                return new_ypred
-        elif z.sum() == 0:
-            if substract_ref:
-                return 0
-            else:
-                return reference
-        else:
-            Z_S = self.nystroem.transform(self.X, active_dims=z)
-            Z_S_new = self.nystroem.transform(X_new, active_dims=z)
-            K_SSn = Z_S @ Z_S_new.T
+            ypred_test = self.krr_weights.T @ self.Z @ self.nystroem.transform(X_test).T
+            return ypred_test - self.reference
 
-            # Only using marginal measure from data, not new points
-            Z_Sc = self.nystroem.transform(self.X, active_dims=zc)
-            K_Sc = Z_Sc @ Z_Sc.T
+        # Naming conventions:
+        # S ⊆ {1, 2, ..., m} is a subset of all m features (coalition)
+        # S represents which features are "present" or "known" when computing the value function
+        # Sp (S prime) refers to test points where we evaluate the value function
+        # Sc (S complement) is the complement set - features NOT in S
+        S = np.where(z)[0]
+        Sc = np.where(~z)[0]
 
-            KME_mat = K_Sc.mean(axis=1)[:, np.newaxis] * torch.ones((self.n, n_))
+        # Create subset kernels for the coalition and its complement
+        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
+        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
 
-            if substract_ref:
-                return self.alphas.T @ (K_SSn * KME_mat) - reference
-            else:
-                return self.alphas.T @ (K_SSn * KME_mat)
+        # Transform using Nyström with subsetted data
+        Z_S = self._nystroem_transform_subset(self.X.numpy(), S_kernel, S)
+        Z_S_new = self._nystroem_transform_subset(X_test, S_kernel, S)
+        K_SSp = Z_S @ Z_S_new.T
 
-    def _value_observation(self, z, X_new, substract_ref=True):
+        Z_Sc = self._nystroem_transform_subset(self.X.numpy(), Sc_kernel, Sc)
+        K_Sc = Z_Sc @ Z_Sc.T
+        KME_mat = K_Sc.mean(dim=1, keepdim=True).repeat(1, n_test)
+
+        return self.krr_weights.T @ (K_SSp * KME_mat) - self.reference
+
+    def _nystroem_transform_subset(
+        self, X: np.ndarray, subset_kernel: SubsetKernel, active_indices: np.ndarray
+    ) -> Tensor:
+        """Apply Nyström transformation with a subset kernel.
+
+        Note: SubsetKernel handles the subsetting internally, so we pass full-dimensional
+        data but scaled appropriately.
         """
-        Compute the conditional expectation E_{Sc|S=s}[f(X_new)|S=s]
+        # Scale data by Nyström lengthscales (full dimensional)
+        X_scaled = X / self.nystroem.ls
+        X_tensor = torch.tensor(X_scaled).float()
 
-        :param z:
-        :param X_new:
-        :return:
+        # Scale landmarks (full dimensional)
+        landmarks_tensor = torch.tensor(self.nystroem.landmarks).float()
+
+        # Apply Nyström transformation with subset kernel
+        # SubsetKernel will internally select the active dimensions
+        ZT = (
+            subset_kernel(landmarks_tensor)
+            .add_jitter()
+            .cholesky()
+            .inv_matmul(subset_kernel(landmarks_tensor, X_tensor).evaluate())
+        )
+
+        return ZT.T
+
+    def _value_observation(self, z: np.ndarray, X_test: np.ndarray) -> Tensor:
+        """Compute observational Shapley value function for coalition z.
+
+        Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
+        Uses Conditional Mean Embedding (CME) to condition on observed features.
+
+        Args:
+            z: Binary coalition vector of shape (m,) indicating active features
+            X_test: Test points of shape (n_test, m)
+
+        Returns:
+            Value function evaluated at X_test, shape (1, n_test)
         """
-        zc = ~z
-        n_ = X_new.shape[0]
-
-        # compute the reference value - using previously trained data
-        reference = self.ypred.mean() * torch.ones((1, n_))
-
-        # Compute Reference
+        if z.sum() == 0:
+            return 0
 
         if z.sum() == self.m:
-            new_ypred = self.alphas.T @ self.Z @ self.nystroem.transform(X_new).T
-            if substract_ref:
-                return new_ypred - reference
-            else:
-                return new_ypred
-        elif z.sum() == 0:
-            if substract_ref:
-                return 0
-            else:
-                return reference
-        else:
-            Z_S = self.nystroem.transform(self.X, active_dims=z)
-            Z_S_new = self.nystroem.transform(X_new, active_dims=z)
-            K_SSn = Z_S @ Z_S_new.T
+            ypred_test = self.krr_weights.T @ self.Z @ self.nystroem.transform(X_test).T
+            return ypred_test - self.reference
 
-            # Only using marginal measure from data, not new points
-            Z_Sc = self.nystroem.transform(self.X, active_dims=zc)
-            cme_latter_part = (
-                lazify(Z_S.T @ Z_S)
-                .add_diag(torch.tensor(self.lambda_cme).float())
-                .inv_matmul(Z_S_new.T)
-            )
-            holder = self.alphas.T @ (K_SSn * (Z_Sc @ Z_Sc.T @ Z_S @ cme_latter_part))
+        S = np.where(z)[0]
+        Sc = np.where(~z)[0]
 
-            if substract_ref:
-                return holder - reference
-            else:
-                return holder
+        # Create subset kernels for the coalition and its complement
+        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
+        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+
+        Z_S = self._nystroem_transform_subset(self.X.numpy(), S_kernel, S)
+        Z_S_new = self._nystroem_transform_subset(X_test, S_kernel, S)
+        K_SSp = Z_S @ Z_S_new.T
+
+        Z_Sc = self._nystroem_transform_subset(self.X.numpy(), Sc_kernel, Sc)
+        K_Sc = Z_Sc @ Z_Sc.T
+
+        # Conditional Mean Embedding operator: maps complement features to coalition features
+        Xi_S = lazify(Z_S.T @ Z_S).add_diag(self.cme_reg).inv_matmul(Z_S_new.T)
+
+        return self.krr_weights.T @ (K_SSp * (K_Sc @ Z_S @ Xi_S)) - self.reference
 
     def fit(
         self,
-        X_new: np.array,
-        method: str = "O",
-        sample_method: str = "MC",
-        num_samples: int = 1000,
-        substract_ref: bool = True,
-        verbose: str = False,
-    ):
-        """[Running the RKHS SHAP Algorithm to explain kernel ridge regression]
+        X_test: Tensor | np.ndarray,
+        method: str,
+        sample_method: str,
+        num_samples: int = 100,
+        wls_reg: float = 1e-10,
+    ) -> np.ndarray:
+        """Compute RKHS-SHAP values for test points.
 
         Args:
-            X_new (np.array): [New X data]
-            method (str, optional): [Interventional Shapley values (I) or Observational Shapley Values (O)]. Defaults to "O".
-            sample_method (str, optional): [What sampling methods to use for the permutations
-                                                if "MC" then you do sampling.
-                                                if None, you look at all potential 2**M permutation ]. Defaults to "MC".
-            num_samples (int, optional): [number of samples to use]. Defaults to None.
-            verbose (str, optional): [description]. Defaults to False.
-        """
+            X_test: Test points to explain, shape (n_test, m)
+            method: "O" (Observational) or "I" (Interventional) Shapley values
+            sample_method: Sampling strategy for coalitions:
+                - "MC": Monte Carlo sampling weighted by Shapley kernel
+                - "MC2": Sample from full coalition space
+                - "full" or None: Enumerate all 2^m coalitions
+            num_samples: Number of coalition samples (if using MC sampling)
+            wls_reg: Regularization for weighted least squares fitting
 
-        n_ = X_new.shape[0]
+        Returns:
+            SHAP values of shape (n_test, m)
+        """
+        if isinstance(X_test, Tensor):
+            X_test = X_test.numpy()
 
         if sample_method == "MC":
             Z = large_scale_sample_alternative(self.m, num_samples)
@@ -208,69 +240,32 @@ class RKHSSHAP_Approx(object):
         else:
             Z = generate_full_Z(self.m)
 
-        # Set up containers
-        epoch = Z.shape[0]
-        Y_target = np.zeros((epoch, n_))
-
+        n_coalitions = Z.shape[0]
+        n_test = X_test.shape[0]
+        Y_target = np.zeros((n_coalitions, n_test))
         count = 0
         weights = []
 
-        if verbose:
-            for row in tqdm(Z):
-                if np.sum(row) == 0 or np.sum(row) == self.m:
-                    weights.append(1e5)
-                else:
-                    z = row
-                    weights.append(
-                        (self.m - 1)
-                        / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
-                    )
+        for row in tqdm(Z):
+            if np.sum(row) == 0 or np.sum(row) == self.m:
+                weights.append(1e5)
+            else:
+                z = row
+                weights.append(
+                    (self.m - 1)
+                    / (binom(self.m, np.sum(z)) * np.sum(z) * (self.m - np.sum(z)))
+                )
 
-                if method == "O":
-                    Y_target[count, :] = self._value_intervention(
-                        row, X_new, substract_ref
-                    )
-                elif method == "I":
-                    Y_target[count, :] = self._value_observation(
-                        row, X_new, substract_ref
-                    )
-                else:
-                    raise ValueError("Must be either interventional or observational")
+            if method == "O":
+                Y_target[count, :] = self._value_observation(row, X_test)
+            elif method == "I":
+                Y_target[count, :] = self._value_intervention(row, X_test)
+            else:
+                raise ValueError("Must be either interventional or observational")
 
-                count += 1
+            count += 1
 
-        else:
-            for row in Z:
-                if np.sum(row) == 0 or np.sum(row) == self.m:
-                    weights.append(1e5)
-                else:
-                    z = row
-                    weights.append(
-                        (
-                            (self.m - 1)
-                            / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
-                        )
-                    )
-
-                if method == "O":
-                    Y_target[count, :] = self._value_intervention(
-                        row, X_new, substract_ref
-                    )
-                elif method == "I":
-                    Y_target[count, :] = self._value_observation(
-                        row, X_new, substract_ref
-                    )
-                else:
-                    raise ValueError("Must be either interventional or observational")
-
-                count += 1
-
-        clf = Ridge(1e-5)
+        clf = Ridge(wls_reg)
         clf.fit(Z, Y_target, sample_weight=weights)
-
-        self.full_shapley_values_ = np.concatenate(
-            [clf.intercept_.reshape(-1, 1), clf.coef_], axis=1
-        )
-        self.SHAP_LM = clf
 
         return clf.coef_
