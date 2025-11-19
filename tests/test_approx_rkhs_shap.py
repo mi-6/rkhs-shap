@@ -8,6 +8,7 @@ import torch
 
 from rkhs_shap.exact_gp import ExactGPModel
 from rkhs_shap.rkhs_shap_approx import RKHSSHAPApprox
+from rkhs_shap.utils import to_tensor
 
 from .conftest import (
     calculate_additivity_mae,
@@ -72,7 +73,7 @@ def run_rkhs_shap_test(
     kernel_name = gp.covar_module.__class__.__name__
 
     lambda_krr = gp.likelihood.noise.detach().cpu().float()
-    lambda_cme = torch.tensor(CME_REGULARIZATION).float()
+    lambda_cme = to_tensor(CME_REGULARIZATION)
 
     rkhs_shap = RKHSSHAPApprox(
         X=X_train,

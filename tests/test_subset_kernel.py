@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from rkhs_shap.subset_kernel import SubsetKernel
+from rkhs_shap.utils import to_tensor
 
 
 def test_subset_kernel_rbf():
@@ -16,8 +17,8 @@ def test_subset_kernel_rbf():
     base_kernel = gpytorch.kernels.ScaleKernel(
         gpytorch.kernels.RBFKernel(ard_num_dims=input_dim)
     )
-    base_kernel.outputscale = torch.tensor(2.0)
-    base_kernel.base_kernel.lengthscale = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+    base_kernel.outputscale = to_tensor(2.0)
+    base_kernel.base_kernel.lengthscale = to_tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
 
     subset_kernel = SubsetKernel(base_kernel, subset_dims=subset_dims)
 
@@ -44,12 +45,12 @@ def test_subset_kernel_rbf():
 def test_subset_kernel_deep_copy():
     """Test that SubsetKernel creates a deep copy of the base kernel."""
     base_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=5)
-    base_kernel.lengthscale = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0])
+    base_kernel.lengthscale = to_tensor([1.0, 2.0, 3.0, 4.0, 5.0])
     subset_kernel = SubsetKernel(base_kernel, subset_dims=[0, 2, 4])
     # Modify original kernel
-    base_kernel.lengthscale = torch.tensor([10.0, 20.0, 30.0, 40.0, 50.0])
+    base_kernel.lengthscale = to_tensor([10.0, 20.0, 30.0, 40.0, 50.0])
     # SubsetKernel should not be affected
-    expected_lengthscales = torch.tensor([1.0, 3.0, 5.0])
+    expected_lengthscales = to_tensor([1.0, 3.0, 5.0])
     actual_lengthscales = subset_kernel.base_kernel.lengthscale.squeeze()
     assert torch.allclose(actual_lengthscales, expected_lengthscales)
 
@@ -87,7 +88,7 @@ def test_subset_kernel_with_matern_kernel():
 
     # Create Matern kernel with nu=2.5 and ARD
     base_kernel = gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=input_dim)
-    base_kernel.lengthscale = torch.tensor([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+    base_kernel.lengthscale = to_tensor([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
 
     subset_kernel = SubsetKernel(base_kernel, subset_dims=subset_dims)
 
@@ -136,7 +137,7 @@ def test_subset_kernel_with_active_dims():
     base_kernel = gpytorch.kernels.RBFKernel(
         ard_num_dims=len(base_active_dims), active_dims=base_active_dims
     )
-    base_kernel.lengthscale = torch.tensor([1.0, 2.0, 3.0, 4.0])
+    base_kernel.lengthscale = to_tensor([1.0, 2.0, 3.0, 4.0])
 
     with pytest.raises(NotImplementedError):
         SubsetKernel(base_kernel, subset_dims=subset_dims)
