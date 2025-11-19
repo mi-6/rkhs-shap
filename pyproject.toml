@@ -15,7 +15,19 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["matplotlib>=3", "pytest>=9", "ruff>=0.14"]
+dev = [
+    "matplotlib>=3",
+    "pyright>=1.1.407",
+    "pytest>=9",
+    "ruff>=0.14",
+]
+
+[tool.pyright]
+# include = ["src", "tests"]
+include = ["tests"]
+# reportUnknownMemberType = false
+# reportUnknownArgumentType = false
+# reportUnknownVariableType = false
 
 [build-system]
 requires = ["uv_build>=0.9.10,<0.10.0"]

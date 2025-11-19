@@ -15,7 +15,10 @@ lint:
 	uv run ruff format --check
 	uv run ruff check
 
+type-check:
+	uv run pyright
+
 test:
 	uv run pytest tests
 
-all: format lint test
+all: format lint type-check test

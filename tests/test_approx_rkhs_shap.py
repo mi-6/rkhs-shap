@@ -79,8 +79,8 @@ def run_rkhs_shap_test(
         X=X_train,
         y=y_train,
         kernel=gp.covar_module,
-        noise_var=lambda_krr,
-        cme_reg=lambda_cme,
+        noise_var=lambda_krr.item(),
+        cme_reg=lambda_cme.item(),
         n_components=N_COMPONENTS,
     )
 
@@ -106,7 +106,7 @@ def run_rkhs_shap_test(
 
     explainer = shap.KernelExplainer(gp.predict_mean_numpy, X_train.numpy())
     kernel_explanation = explainer(X_explain.numpy())
-    kernel_values = kernel_explanation.values
+    kernel_values = np.asarray(kernel_explanation.values)
     kernel_additivity_mae = calculate_additivity_mae(
         kernel_values, model_preds, baseline
     )
@@ -130,19 +130,19 @@ def run_rkhs_shap_test(
     assert shap_values_I.shape == (N_EXPLAIN_SAMPLES, X_train.shape[1])
     assert shap_values_O.shape == (N_EXPLAIN_SAMPLES, X_train.shape[1])
 
-    assert additivity_mae_I < MAX_ADDITIVITY_MAE, (
-        f"Interventional additivity error too large: {additivity_mae_I}"
-    )
-    assert additivity_mae_O < MAX_ADDITIVITY_MAE, (
-        f"Observational additivity error too large: {additivity_mae_O}"
-    )
+    assert (
+        additivity_mae_I < MAX_ADDITIVITY_MAE
+    ), f"Interventional additivity error too large: {additivity_mae_I}"
+    assert (
+        additivity_mae_O < MAX_ADDITIVITY_MAE
+    ), f"Observational additivity error too large: {additivity_mae_O}"
 
-    assert mean_corr_I > MIN_INTERVENTIONAL_CORRELATION, (
-        f"Interventional correlation with KernelSHAP too low: {mean_corr_I}"
-    )
-    assert mean_corr_O > min_corr_O, (
-        f"Observational correlation with KernelSHAP too low: {mean_corr_O}"
-    )
+    assert (
+        mean_corr_I > MIN_INTERVENTIONAL_CORRELATION
+    ), f"Interventional correlation with KernelSHAP too low: {mean_corr_I}"
+    assert (
+        mean_corr_O > min_corr_O
+    ), f"Observational correlation with KernelSHAP too low: {mean_corr_O}"
 
     print("\n" + "=" * 60)
     print(f"{kernel_name} Kernel test passed (Approximate)!")

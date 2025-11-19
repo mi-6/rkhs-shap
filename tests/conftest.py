@@ -50,7 +50,7 @@ def calculate_correlation(values1: np.ndarray, values2: np.ndarray) -> float:
         corr = np.corrcoef(values1[i], values2[i])[0, 1]
         if not np.isnan(corr):
             correlations.append(corr)
-    return np.mean(correlations)
+    return float(np.mean(correlations))
 
 
 @pytest.fixture
