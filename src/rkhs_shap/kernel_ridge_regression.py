@@ -66,7 +66,7 @@ class KernelRidgeRegressor(object):
 
         # Create alphas
         Kxx = self.k(self.X)
-        self.alpha = Kxx.add_diag(self.lmda).inv_matmul(self.y)
+        self.alpha = Kxx.add_diagonal(self.lmda).solve(self.y)
 
         self.flip_switch = 1
 
@@ -74,4 +74,4 @@ class KernelRidgeRegressor(object):
         X_test = torch.tensor(X_test).float()
         Kxnx = self.k(X_test, self.X)
 
-        return (Kxnx.evaluate() @ self.alpha).detach().numpy()
+        return (Kxnx.to_dense() @ self.alpha).detach().numpy()

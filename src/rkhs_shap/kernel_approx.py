@@ -52,7 +52,7 @@ class Nystroem:
             self.kernel(self.landmarks)
             .add_jitter()
             .cholesky()
-            .inv_matmul(self.kernel(self.landmarks, X_tensor).evaluate())
+            .solve(self.kernel(self.landmarks, X_tensor).to_dense())
         )
 
         return ZT.T
