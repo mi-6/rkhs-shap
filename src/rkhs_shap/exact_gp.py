@@ -2,6 +2,8 @@ import gpytorch
 import numpy as np
 import torch
 
+from rkhs_shap.utils import to_tensor
+
 
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(
@@ -34,7 +36,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
             return self.likelihood(self(x))
 
     def predict_mean_numpy(self, x: np.ndarray) -> np.ndarray:
-        x_tensor = torch.tensor(x)
+        x_tensor = to_tensor(x)
         posterior = self.predict(x_tensor)
         return posterior.mean.numpy()
 

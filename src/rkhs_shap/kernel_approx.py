@@ -4,6 +4,8 @@ from gpytorch.kernels import Kernel
 from sklearn.cluster import KMeans
 from torch import Tensor
 
+from rkhs_shap.utils import to_tensor
+
 
 class Nystroem:
     """Nyström approximation for GPyTorch kernels.
@@ -45,7 +47,7 @@ class Nystroem:
         if self.landmarks is None:
             raise ValueError("Must call fit() before transform()")
 
-        X_tensor = torch.tensor(X, dtype=torch.float32)
+        X_tensor = to_tensor(X)
 
         # Compute K_mm^{-1/2} @ K_mn
         ZT = (

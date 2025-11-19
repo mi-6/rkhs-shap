@@ -3,13 +3,15 @@ import numpy as np
 import torch
 from sklearn.metrics import pairwise_distances
 
+from rkhs_shap.utils import to_tensor
+
 
 def compute_median_heuristic(X):
     median_heuristic = [
         np.median(pairwise_distances(X[:, [i]].reshape(-1, 1)))
         for i in range(X.shape[1])
     ]
-    return torch.tensor(median_heuristic)
+    return to_tensor(median_heuristic)
 
 
 class _ExactGPModel(gpytorch.models.ExactGP):
@@ -27,8 +29,8 @@ class _ExactGPModel(gpytorch.models.ExactGP):
 
 class KernelRidgeRegressor(object):
     def __init__(self, X, y):
-        self.X = torch.tensor(X).float()
-        self.y = torch.tensor(y).float()
+        self.X = to_tensor(X)
+        self.y = to_tensor(y)
         self.fit_switch = 0
         # self.lengthscale = compute_median_heuristic(X)
 
@@ -62,7 +64,7 @@ class KernelRidgeRegressor(object):
         # Store optimal parameters
         self.k = model.covar_module
         self.k.raw_lengthscale.require_grad = False
-        self.lmda = torch.tensor(model.likelihood.noise.item())
+        self.lmda = to_tensor(model.likelihood.noise.item())
 
         # Create alphas
         Kxx = self.k(self.X)
@@ -71,7 +73,7 @@ class KernelRidgeRegressor(object):
         self.flip_switch = 1
 
     def predict(self, X_test):
-        X_test = torch.tensor(X_test).float()
+        X_test = to_tensor(X_test)
         Kxnx = self.k(X_test, self.X)
 
         return (Kxnx.to_dense() @ self.alpha).detach().numpy()

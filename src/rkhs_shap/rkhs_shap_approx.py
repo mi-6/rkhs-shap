@@ -9,7 +9,7 @@ from torch import Tensor
 from rkhs_shap.kernel_approx import Nystroem
 from rkhs_shap.rkhs_shap_base import RKHSSHAPBase
 from rkhs_shap.subset_kernel import SubsetKernel
-from rkhs_shap.utils import freeze_parameters
+from rkhs_shap.utils import freeze_parameters, to_tensor
 
 
 class RKHSSHAPApprox(RKHSSHAPBase):
@@ -39,8 +39,8 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         self.n, self.m = X.shape
         self.X, self.y = X.float(), y
 
-        noise_var = torch.tensor(noise_var, dtype=torch.float32)
-        cme_reg = torch.tensor(cme_reg, dtype=torch.float32)
+        noise_var = to_tensor(noise_var)
+        cme_reg = to_tensor(cme_reg)
         self.cme_reg = cme_reg
 
         self.kernel = deepcopy(kernel)
@@ -119,7 +119,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         Note: SubsetKernel handles the subsetting internally, so we pass full-dimensional
         data and let the kernel handle feature selection.
         """
-        X_tensor = torch.tensor(X, dtype=torch.float32)
+        X_tensor = to_tensor(X)
 
         # Apply Nyström transformation with subset kernel
         # SubsetKernel will internally select the active dimensions

@@ -11,6 +11,7 @@ from rkhs_shap.sampling import (
     generate_full_Z,
     large_scale_sample_alternative,
 )
+from rkhs_shap.utils import to_tensor
 
 
 def insert_i(ls, feature_to_exclude):
@@ -95,7 +96,7 @@ class ShapleyRegulariser(object):
             Z_Sc = self.nystroem.transform(X, active_dims=zc)
             cme_latter_part = (
                 to_linear_operator(Z_S.T @ Z_S)
-                .add_diagonal(torch.tensor(self.lambda_cme).float())
+                .add_diagonal(to_tensor(self.lambda_cme))
                 .solve(Z_S.T)
             )
             holder = K_SS * (Z_Sc @ Z_Sc.T @ Z_S @ cme_latter_part)
@@ -129,7 +130,7 @@ class ShapleyRegulariser(object):
         self.ls = ls
 
         rbf = RBFKernel()
-        rbf.lengthscale = torch.tensor(ls)
+        rbf.lengthscale = to_tensor(ls)
         rbf.raw_lengthscale.requires_grad = False
 
         ny = Nystroem(kernel=rbf, n_components=self.n_components)
@@ -173,10 +174,10 @@ class ShapleyRegulariser(object):
         self.A = A
 
         # Formulate the regression
-        y_ten = torch.tensor(y).reshape(-1, 1).float()
-        A = to_linear_operator(torch.tensor(A).float())
+        y_ten = to_tensor(y).reshape(-1, 1)
+        A = to_linear_operator(to_tensor(A))
         self.AAt = A @ A.t()
-        K = rbf(torch.tensor(X / ls)).float()
+        K = rbf(to_tensor(X / ls))
         alphas = (
             (K @ K + self.lambda_krr * K + self.lambda_sv * self.AAt)
             .add_jitter()

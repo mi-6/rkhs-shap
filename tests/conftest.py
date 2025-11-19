@@ -7,6 +7,7 @@ import shap
 import torch
 
 from rkhs_shap.exact_gp import ExactGPModel
+from rkhs_shap.utils import to_tensor
 
 N_TRAIN_SAMPLES = 100
 
@@ -75,8 +76,8 @@ def train_gp_model(
     y_train: np.ndarray,
     covar_module: gpytorch.kernels.Kernel | None = None,
 ) -> tuple[ExactGPModel, torch.Tensor, torch.Tensor]:
-    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-    y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+    X_train_tensor = to_tensor(X_train)
+    y_train_tensor = to_tensor(y_train)
     gp = ExactGPModel(X_train_tensor, y_train_tensor, covar_module=covar_module)
     gp.fit()
     return gp, X_train_tensor, y_train_tensor
