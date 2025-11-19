@@ -10,7 +10,7 @@ from gpytorch.kernels import RBFKernel
 from gpytorch.lazy import lazify
 from tqdm import tqdm
 
-from rkhs_shap.kernel_approx import Nystroem_gpytorch
+from rkhs_shap.kernel_approx import Nystroem
 from rkhs_shap.sampling import (
     generate_full_Z,
     large_scale_sample_alternative,
@@ -136,7 +136,7 @@ class ShapleyRegulariser(object):
         rbf.lengthscale = torch.tensor(ls)
         rbf.raw_lengthscale.requires_grad = False
 
-        ny = Nystroem_gpytorch(kernel=rbf, n_components=self.n_components)
+        ny = Nystroem(kernel=rbf, n_components=self.n_components)
         ny.fit(self.X)
         Phi = ny.transform(self.X)
         self.Z = Phi

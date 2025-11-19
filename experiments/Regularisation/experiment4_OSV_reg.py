@@ -15,7 +15,7 @@ sys.path.append(base_dir)
 from experiments.Regularisation.correlated_linear_model import (  # noqa: E402
     CorrelatedLinearModel,
 )
-from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx  # noqa: E402
+from rkhs_shap.rkhs_shap_approx import RKHSSHAPApprox  # noqa: E402
 from rkhs_shap.shapley_regulariser import ShapleyRegulariser  # noqa: E402
 
 MYDIR = "experiments/Regularisation/results"
@@ -66,7 +66,7 @@ for lambda_sv in lambda_sv_ls:
         features_index=[4],
     )
 
-    rkhs_shap = RKHSSHAP_Approx(
+    rkhs_shap = RKHSSHAPApprox(
         X=X,
         y=krr_reg.ypred,
         lambda_krr=1e-2,
@@ -97,7 +97,7 @@ for lambda_sv in lambda_sv_ls:
         features_index=[4],
     )
 
-    rkhs_shap = RKHSSHAP_Approx(
+    rkhs_shap = RKHSSHAPApprox(
         X=X,
         y=krr_reg.ypred,
         lambda_krr=1e-2,

@@ -7,7 +7,7 @@ import shap
 import torch
 
 from rkhs_shap.examples.exact_gp import ExactGPModel
-from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx
+from rkhs_shap.rkhs_shap_approx import RKHSSHAPApprox
 
 from .conftest import (
     calculate_additivity_mae,
@@ -74,7 +74,7 @@ def run_rkhs_shap_test(
     lambda_krr = gp.likelihood.noise.detach().cpu().float()
     lambda_cme = torch.tensor(CME_REGULARIZATION).float()
 
-    rkhs_shap = RKHSSHAP_Approx(
+    rkhs_shap = RKHSSHAPApprox(
         X=X_train,
         y=y_train,
         kernel=gp.covar_module,
@@ -167,7 +167,7 @@ def test_approx_accepts_tensor_and_array(trained_model):
     """Test that approximate RKHS-SHAP accepts both Tensor and ndarray inputs."""
     gp, X_train, y_train = trained_model
 
-    rkhs_shap = RKHSSHAP_Approx(
+    rkhs_shap = RKHSSHAPApprox(
         X=X_train,
         y=y_train,
         kernel=gp.covar_module,

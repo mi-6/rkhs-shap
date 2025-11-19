@@ -13,7 +13,7 @@ from sklearn.linear_model import Ridge
 from torch import Tensor
 from tqdm import tqdm
 
-from rkhs_shap.kernel_approx import Nystroem_gpytorch
+from rkhs_shap.kernel_approx import Nystroem
 from rkhs_shap.sampling import (
     generate_full_Z,
     large_scale_sample_alternative,
@@ -23,7 +23,7 @@ from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters
 
 
-class RKHSSHAP_Approx(object):
+class RKHSSHAPApprox:
     """Implement the RKHS SHAP algorithm with Nyström kernel approximation"""
 
     def __init__(
@@ -58,7 +58,7 @@ class RKHSSHAP_Approx(object):
         freeze_parameters(self.kernel)
 
         # Run Nyström approximation and Kernel Ridge Regression
-        self.nystroem = Nystroem_gpytorch(kernel=self.kernel, n_components=n_components)
+        self.nystroem = Nystroem(kernel=self.kernel, n_components=n_components)
         self.nystroem.fit(self.X.numpy())
         Z = self.nystroem.transform(self.X.numpy())
         K_train = Z @ Z.T

@@ -5,7 +5,7 @@ from sklearn.cluster import KMeans
 from torch import Tensor
 
 
-class Nystroem_gpytorch(object):
+class Nystroem:
     """Nyström approximation for GPyTorch kernels.
 
     Uses KMeans to select landmark points, then approximates kernel matrices

@@ -18,7 +18,7 @@ from experiments.Regularisation.correlated_linear_model import (  # noqa: E402
     CorrelatedLinearModel,
 )
 from rkhs_shap.kernel_ridge_regression import KernelRidgeRegressor  # noqa: E402
-from rkhs_shap.rkhs_shap_approx import RKHSSHAP_Approx  # noqa: E402
+from rkhs_shap.rkhs_shap_approx import RKHSSHAPApprox  # noqa: E402
 from rkhs_shap.shapley_regulariser import ShapleyRegulariser  # noqa: E402
 
 
@@ -60,7 +60,7 @@ def fit_rkhs_shap(
     print("Kernel Lengthscale:", krr.k.lengthscale)
 
     # Step 2: RUN RKHS-SHAP and plot the distribution of the Shapley Values
-    rkhs_shap = RKHSSHAP_Approx(
+    rkhs_shap = RKHSSHAPApprox(
         X=X,
         y=y,
         lambda_krr=krr.lmda,
@@ -109,7 +109,7 @@ def fair_learning_with_rkhs_shap(
         sample_method="Not MC",
     )
 
-    rkhs_shap = RKHSSHAP_Approx(
+    rkhs_shap = RKHSSHAPApprox(
         X=X,
         y=krr_reg.ypred,
         lambda_krr=lambda_krr,
