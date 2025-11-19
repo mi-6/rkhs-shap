@@ -127,6 +127,7 @@ def generate_samples_Z(m: int, mcmc_run: int, warm_up_cut: int) -> np.ndarray:
     z_init = np.random.choice([1, -1], size=m)
     z_vec: list[np.ndarray] = []
     z_vec.append(z_init)
+    propose = z_init
 
     count = 0
     while count <= mcmc_run:

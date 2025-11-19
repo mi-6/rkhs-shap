@@ -35,19 +35,17 @@ class RKHSSHAP(RKHSSHAPBase):
         self.n, self.m = X.shape
         self.X, self.y = X.float(), y
 
-        noise_var = to_tensor(noise_var)
-        cme_reg = to_tensor(cme_reg)
-        self.cme_reg = cme_reg
+        self.cme_reg = to_tensor(cme_reg)
 
         self.kernel = deepcopy(kernel)
         freeze_parameters(self.kernel)
 
         # Run Kernel Ridge Regression
         K_train = self.kernel(self.X)
-        krr_weights: Tensor = K_train.add_diagonal(noise_var).solve(self.y)
+        krr_weights: Tensor = K_train.add_diagonal(to_tensor(noise_var)).solve(self.y)
 
         self.krr_weights = krr_weights.reshape(-1, 1)
-        self.ypred = K_train @ krr_weights
+        self.ypred = K_train.to_dense() @ krr_weights
         self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2).item()
         self.reference = self.ypred.mean().item()
 
@@ -97,7 +95,7 @@ class RKHSSHAP(RKHSSHAPBase):
         # Sc (S complement) is the complement set - features NOT in S
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
-        K_SSp = S_kernel(self.X, X_test).to_dense().float()
+        K_SSp = S_kernel(self.X, X_test).to_dense()
         K_Sc = Sc_kernel(self.X, self.X).to_dense()
         KME_mat = K_Sc.mean(axis=1, keepdim=True).repeat(1, n_test)
 
@@ -117,7 +115,7 @@ class RKHSSHAP(RKHSSHAPBase):
             Value function evaluated at X_test, shape (1, n_test)
         """
         if z.sum() == 0:
-            return 0
+            return torch.zeros(1, X_test.shape[0])
 
         if z.sum() == self.m:
             ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).to_dense()

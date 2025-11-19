@@ -29,7 +29,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
-    def predict(self, x: torch.Tensor) -> gpytorch.distributions.MultivariateNormal:
+    def predict(self, x: torch.Tensor) -> torch.distributions.Distribution:
         self.eval()
         self.likelihood.eval()
         with torch.no_grad():
@@ -41,6 +41,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         return posterior.mean.numpy()
 
     def fit(self, training_iter: int = 50, lr: float = 0.1) -> None:
+        assert self.train_inputs is not None
         train_x = self.train_inputs[0]
         train_y = self.train_targets
         self.train()
@@ -91,8 +92,10 @@ if __name__ == "__main__":
     X_test = input_scaler.transform(X_test)
 
     output_scaler = StandardScaler()
-    train_y = output_scaler.fit_transform(train_y.reshape(-1, 1)).flatten()
-    test_y = output_scaler.transform(test_y.reshape(-1, 1)).flatten()
+    train_y_array = np.asarray(train_y).reshape(-1, 1)
+    train_y = output_scaler.fit_transform(train_y_array).flatten()
+    test_y_array = np.asarray(test_y).reshape(-1, 1)
+    test_y = output_scaler.transform(test_y_array).flatten()
 
     train_x = torch.tensor(X_train, dtype=torch.float32)
     train_y = torch.tensor(train_y, dtype=torch.float32)

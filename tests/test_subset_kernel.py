@@ -27,7 +27,7 @@ def test_subset_kernel_rbf():
 
     # Manually compute expected kernel matrix
     x_subset = x[:, subset_dims]
-    lengthscales_subset = base_kernel.base_kernel.lengthscale[..., subset_dims]
+    lengthscales_subset = base_kernel.base_kernel.lengthscale.squeeze()[subset_dims]
     x_scaled = x_subset / lengthscales_subset
     squared_distances = torch.cdist(x_scaled, x_scaled, p=2).pow(2)
     kernel_expected = base_kernel.outputscale * torch.exp(-0.5 * squared_distances)
@@ -37,9 +37,10 @@ def test_subset_kernel_rbf():
     max_error = (kernel_expected - kernel_actual).abs().max().item()
     assert max_error < 1e-6, f"Error too large: {max_error}"
     assert kernel_actual.shape == (n_samples, n_samples)
-    assert subset_kernel.base_kernel.base_kernel.lengthscale.shape[-1] == len(
-        subset_dims
-    )
+    scale_kernel = subset_kernel.base_kernel
+    assert hasattr(scale_kernel, "base_kernel")
+    inner_kernel = scale_kernel.base_kernel
+    assert inner_kernel.lengthscale.shape[-1] == len(subset_dims)  # type: ignore[index]
 
 
 def test_subset_kernel_deep_copy():
@@ -77,7 +78,7 @@ def test_subset_kernel_diagonal_computation():
 
     # Diagonal should be all ones for RBF kernel (self-similarity)
     assert kernel_diag.shape == (n_samples,)
-    assert torch.allclose(kernel_diag, torch.ones(n_samples), atol=1e-5)
+    assert torch.allclose(kernel_diag, torch.ones(n_samples), atol=1e-5)  # type: ignore[arg-type]
 
 
 def test_subset_kernel_with_matern_kernel():
@@ -100,7 +101,7 @@ def test_subset_kernel_with_matern_kernel():
 
     # Compute expected kernel matrix manually
     x_subset = x[:, subset_dims]
-    lengthscales_subset = base_kernel.lengthscale[..., subset_dims]
+    lengthscales_subset = base_kernel.lengthscale.squeeze()[subset_dims]
 
     # Create a fresh Matern kernel with correct dimensionality
     expected_kernel = gpytorch.kernels.MaternKernel(
@@ -115,7 +116,7 @@ def test_subset_kernel_with_matern_kernel():
     assert kernel_actual.shape == (n_samples, n_samples)
 
     # Check that lengthscales were correctly subsetted
-    expected_lengthscales = base_kernel.lengthscale[..., subset_dims]
+    expected_lengthscales = base_kernel.lengthscale.squeeze()[subset_dims]
     actual_lengthscales = subset_kernel.base_kernel.lengthscale
     assert torch.allclose(actual_lengthscales, expected_lengthscales)
 
@@ -132,7 +133,7 @@ def test_subset_kernel_with_matern_kernel():
 
 def test_subset_kernel_with_active_dims():
     """Test SubsetKernel with a base kernel that uses active_dims."""
-    base_active_dims = [1, 3, 5, 7]
+    base_active_dims = (1, 3, 5, 7)
     subset_dims = [0, 2]
     base_kernel = gpytorch.kernels.RBFKernel(
         ard_num_dims=len(base_active_dims), active_dims=base_active_dims

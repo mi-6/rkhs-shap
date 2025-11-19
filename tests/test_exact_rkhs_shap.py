@@ -78,8 +78,8 @@ def run_rkhs_shap_test(
         X=X_train,
         y=y_train,
         kernel=gp.covar_module,
-        noise_var=lambda_krr,
-        cme_reg=lambda_cme,
+        noise_var=lambda_krr.item(),
+        cme_reg=lambda_cme.item(),
     )
 
     X_explain = X_train[:N_EXPLAIN_SAMPLES]
@@ -104,7 +104,7 @@ def run_rkhs_shap_test(
 
     explainer = shap.KernelExplainer(gp.predict_mean_numpy, X_train.numpy())
     kernel_explanation = explainer(X_explain.numpy())
-    kernel_values = kernel_explanation.values
+    kernel_values = np.asarray(kernel_explanation.values)
     kernel_additivity_mae = calculate_additivity_mae(
         kernel_values, model_preds, baseline
     )

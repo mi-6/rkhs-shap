@@ -19,7 +19,7 @@ def insert_i(ls, feature_to_exclude):
     """
     A helping function for computing Shapley functional in ShapleyRegulariser
     """
-    subset_vec = np.array([True for i in range(len(ls) + 1)])
+    subset_vec = np.array([True for _ in range(len(ls) + 1)])
     subset_vec[feature_to_exclude] = False
 
     holder = np.zeros(len(ls) + 1)
@@ -91,7 +91,7 @@ class ShapleyRegulariser(object):
         """
 
         zc = ~z
-        n, m = X.shape
+        n = X.shape[0]
 
         if z.sum() == 0:
             return self.Kx
@@ -131,9 +131,9 @@ class ShapleyRegulariser(object):
 
     def fit(
         self,
-        X: float,
-        y: float,
-        ls: float,
+        X: np.ndarray | torch.Tensor,
+        y: np.ndarray | torch.Tensor,
+        ls: np.ndarray | torch.Tensor,
         features_index: list,
         method: str = "O",
         num_samples: int = 300,
