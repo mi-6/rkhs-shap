@@ -6,7 +6,7 @@ import pytest
 import shap
 import torch
 
-from rkhs_shap.examples.exact_gp import ExactGPModel
+from rkhs_shap.exact_gp import ExactGPModel
 from rkhs_shap.rkhs_shap_approx import RKHSSHAPApprox
 
 from .conftest import (

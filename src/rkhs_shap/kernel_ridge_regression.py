@@ -1,5 +1,3 @@
-"""[Fitting a Kernel Ridge Regressor]"""
-
 import gpytorch
 import numpy as np
 import torch
@@ -14,9 +12,9 @@ def compute_median_heuristic(X):
     return torch.tensor(median_heuristic)
 
 
-class ExactGPModel(gpytorch.models.ExactGP):
+class _ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, lengthscale):
-        super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
+        super().__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = gpytorch.kernels.RBFKernel(ard_num_dims=train_x.shape[1])
         self.covar_module.lengthscale = lengthscale
@@ -37,7 +35,7 @@ class KernelRidgeRegressor(object):
     def fit(self, epoch=500, lr=1e-1, verbose=True, lengthscale=None):
         # define a GP model for optimisation
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
-        model = ExactGPModel(self.X, self.y, likelihood, lengthscale)
+        model = _ExactGPModel(self.X, self.y, likelihood, lengthscale)
 
         model.train()
         likelihood.train()

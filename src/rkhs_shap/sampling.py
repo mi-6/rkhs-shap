@@ -3,8 +3,6 @@ from itertools import combinations
 import numpy as np
 from scipy.special import binom
 
-"""This file contains code for sampling coalitions to run the weighed least square approach in RKHS-SHAP."""
-
 
 def generate_full_Z(m: int) -> np.ndarray:
     """Generate the 2^m possible ordering of the binary matrix

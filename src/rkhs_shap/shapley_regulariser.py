@@ -1,7 +1,3 @@
-#################################################
-# KernelSHAP4K For Fair Learning Regularisation #
-#################################################
-
 import copy
 
 import numpy as np
