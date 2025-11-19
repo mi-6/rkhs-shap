@@ -12,47 +12,6 @@ from rkhs_shap.utils import to_tensor
 N_TRAIN_SAMPLES = 100
 
 
-def calculate_additivity_mae(
-    shap_values: np.ndarray, model_preds: torch.Tensor, baseline: float
-) -> float:
-    """
-    Calculate the mean absolute error of the additivity property.
-
-    The additivity property states that sum of SHAP values plus baseline
-    should equal the model prediction: baseline + sum(shap_values) = f(x)
-
-    Args:
-        shap_values: Array of SHAP values (n_samples, n_features)
-        model_preds: Model predictions for each sample
-        baseline: Baseline prediction (usually mean of training predictions)
-
-    Returns:
-        float: Mean absolute additivity error
-    """
-    shap_sums = shap_values.sum(axis=1)
-    pred_diffs = model_preds.numpy() - baseline
-    return np.mean(np.abs(shap_sums - pred_diffs))
-
-
-def calculate_correlation(values1: np.ndarray, values2: np.ndarray) -> float:
-    """
-    Calculate mean correlation between two sets of SHAP values.
-
-    Args:
-        values1: First set of SHAP values (n_samples, n_features)
-        values2: Second set of SHAP values (n_samples, n_features)
-
-    Returns:
-        float: Mean correlation across all samples
-    """
-    correlations = []
-    for i in range(values1.shape[0]):
-        corr = np.corrcoef(values1[i], values2[i])[0, 1]
-        if not np.isnan(corr):
-            correlations.append(corr)
-    return float(np.mean(correlations))
-
-
 @pytest.fixture
 def diabetes_data() -> tuple[np.ndarray, np.ndarray]:
     """Load and preprocess the diabetes dataset from SHAP."""

@@ -8,14 +8,9 @@ import torch
 
 from rkhs_shap.exact_gp import ExactGPModel
 from rkhs_shap.rkhs_shap_exact import RKHSSHAP
-from rkhs_shap.utils import to_tensor
+from rkhs_shap.utils import calculate_additivity_mae, calculate_correlation, to_tensor
 
-from .conftest import (
-    calculate_additivity_mae,
-    calculate_correlation,
-    get_train_subset,
-    train_gp_model,
-)
+from .conftest import get_train_subset, train_gp_model
 
 # Test configuration constants
 N_EXPLAIN_SAMPLES = 10
