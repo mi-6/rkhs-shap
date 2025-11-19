@@ -133,11 +133,10 @@ class ShapleyRegulariser(object):
         self.ls = ls
 
         rbf = RBFKernel()
+        rbf.lengthscale = torch.tensor(ls)
         rbf.raw_lengthscale.requires_grad = False
 
-        ny = Nystroem_gpytorch(
-            kernel=rbf, lengthscale=self.ls, n_components=self.n_components
-        )
+        ny = Nystroem_gpytorch(kernel=rbf, n_components=self.n_components)
         ny.fit(self.X)
         Phi = ny.transform(self.X)
         self.Z = Phi
