@@ -8,22 +8,15 @@ import numpy as np
 import torch
 from gpytorch.kernels import Kernel
 from gpytorch.lazy import lazify
-from scipy.special import binom
-from sklearn.linear_model import Ridge
 from torch import Tensor
-from tqdm import tqdm
 
 from rkhs_shap.kernel_approx import Nystroem
-from rkhs_shap.sampling import (
-    generate_full_Z,
-    large_scale_sample_alternative,
-    subset_full_Z,
-)
+from rkhs_shap.rkhs_shap_base import RKHSSHAPBase
 from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters
 
 
-class RKHSSHAPApprox:
+class RKHSSHAPApprox(RKHSSHAPBase):
     """Implement the RKHS SHAP algorithm with Nyström kernel approximation"""
 
     def __init__(
@@ -110,11 +103,11 @@ class RKHSSHAPApprox:
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
 
         # Transform using Nyström with subsetted data
-        Z_S = self._nystroem_transform_subset(self.X.numpy(), S_kernel, S)
-        Z_S_new = self._nystroem_transform_subset(X_test, S_kernel, S)
+        Z_S = self._nystroem_transform_subset(self.X.numpy(), S_kernel)
+        Z_S_new = self._nystroem_transform_subset(X_test, S_kernel)
         K_SSp = Z_S @ Z_S_new.T
 
-        Z_Sc = self._nystroem_transform_subset(self.X.numpy(), Sc_kernel, Sc)
+        Z_Sc = self._nystroem_transform_subset(self.X.numpy(), Sc_kernel)
         K_Sc = Z_Sc @ Z_Sc.T
         KME_mat = K_Sc.mean(dim=1, keepdim=True).repeat(1, n_test)
 
@@ -167,75 +160,14 @@ class RKHSSHAPApprox:
         S_kernel = SubsetKernel(self.kernel, subset_dims=S)
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
 
-        Z_S = self._nystroem_transform_subset(self.X.numpy(), S_kernel, S)
-        Z_S_new = self._nystroem_transform_subset(X_test, S_kernel, S)
+        Z_S = self._nystroem_transform_subset(self.X.numpy(), S_kernel)
+        Z_S_new = self._nystroem_transform_subset(X_test, S_kernel)
         K_SSp = Z_S @ Z_S_new.T
 
-        Z_Sc = self._nystroem_transform_subset(self.X.numpy(), Sc_kernel, Sc)
+        Z_Sc = self._nystroem_transform_subset(self.X.numpy(), Sc_kernel)
         K_Sc = Z_Sc @ Z_Sc.T
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
         Xi_S = lazify(Z_S.T @ Z_S).add_diag(self.cme_reg).inv_matmul(Z_S_new.T)
 
         return self.krr_weights.T @ (K_SSp * (K_Sc @ Z_S @ Xi_S)) - self.reference
-
-    def fit(
-        self,
-        X_test: Tensor,
-        method: str,
-        sample_method: str,
-        num_samples: int = 100,
-        wls_reg: float = 1e-10,
-    ) -> np.ndarray:
-        """Compute RKHS-SHAP values for test points.
-
-        Args:
-            X_test: Test points to explain, shape (n_test, m)
-            method: "O" (Observational) or "I" (Interventional) Shapley values
-            sample_method: Sampling strategy for coalitions:
-                - "MC": Monte Carlo sampling weighted by Shapley kernel
-                - "MC2": Sample from full coalition space
-                - "full" or None: Enumerate all 2^m coalitions
-            num_samples: Number of coalition samples (if using MC sampling)
-            wls_reg: Regularization for weighted least squares fitting
-
-        Returns:
-            SHAP values of shape (n_test, m)
-        """
-        if sample_method == "MC":
-            Z = large_scale_sample_alternative(self.m, num_samples)
-        elif sample_method == "MC2":
-            Z = generate_full_Z(self.m)
-            Z = subset_full_Z(Z, samples=num_samples)
-        else:
-            Z = generate_full_Z(self.m)
-
-        n_coalitions = Z.shape[0]
-        n_test = X_test.shape[0]
-        Y_target = np.zeros((n_coalitions, n_test))
-        count = 0
-        weights = []
-
-        for row in tqdm(Z):
-            if np.sum(row) == 0 or np.sum(row) == self.m:
-                weights.append(1e5)
-            else:
-                z = row
-                weights.append(
-                    (self.m - 1)
-                    / (binom(self.m, np.sum(z)) * np.sum(z) * (self.m - np.sum(z)))
-                )
-
-            if method == "O":
-                Y_target[count, :] = self._value_observation(row, X_test)
-            elif method == "I":
-                Y_target[count, :] = self._value_intervention(row, X_test)
-            else:
-                raise ValueError("Must be either interventional or observational")
-
-            count += 1
-
-        clf = Ridge(wls_reg)
-        clf.fit(Z, Y_target, sample_weight=weights)
-
-        return clf.coef_

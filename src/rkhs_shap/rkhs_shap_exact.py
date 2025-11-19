@@ -7,23 +7,14 @@ from copy import deepcopy
 import numpy as np
 import torch
 from gpytorch.kernels import Kernel
-from scipy.special import binom
-
-# from gpytorch.lazy import lazify
-from sklearn.linear_model import Ridge
 from torch import Tensor
-from tqdm import tqdm
 
-from rkhs_shap.sampling import (
-    generate_full_Z,
-    large_scale_sample_alternative,
-    subset_full_Z,
-)
+from rkhs_shap.rkhs_shap_base import RKHSSHAPBase
 from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters
 
 
-class RKHSSHAP(object):
+class RKHSSHAP(RKHSSHAPBase):
     """Implement the exact RKHS SHAP algorithm with no kernel approximation"""
 
     def __init__(
@@ -146,49 +137,3 @@ class RKHSSHAP(object):
         Xi_S = (K_SS.add_diag(self.n * self.cme_reg).inv_matmul(K_Sc.evaluate())).T
 
         return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - self.reference
-
-    def fit(
-        self,
-        X_test: Tensor,
-        method: str,
-        sample_method: str,
-        num_samples: int = 100,
-        wls_reg: float = 1e-10,
-    ) -> np.ndarray:
-        if sample_method == "MC":
-            Z = large_scale_sample_alternative(self.m, num_samples)
-        elif sample_method == "MC2":
-            Z = generate_full_Z(self.m)
-            Z = subset_full_Z(Z, samples=num_samples)
-        else:
-            Z = generate_full_Z(self.m)
-
-        n_coalitions = Z.shape[0]
-        n_test = X_test.shape[0]
-        Y_target = np.zeros((n_coalitions, n_test))
-        count = 0
-        weights = []
-
-        for row in tqdm(Z):
-            if np.sum(row) == 0 or np.sum(row) == self.m:
-                weights.append(1e5)
-
-            else:
-                z = row
-                weights.append(
-                    (self.m - 1) / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
-                )
-
-            if method == "O":
-                Y_target[count, :] = self._value_observation(row, X_test)
-            elif method == "I":
-                Y_target[count, :] = self._value_intervention(row, X_test)
-            else:
-                raise ValueError("Must be either interventional or observational")
-
-            count += 1
-
-        clf = Ridge(wls_reg)
-        clf.fit(Z, Y_target, sample_weight=weights)
-
-        return clf.coef_
