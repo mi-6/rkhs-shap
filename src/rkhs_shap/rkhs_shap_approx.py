@@ -121,7 +121,7 @@ class RKHSSHAPApprox:
         return self.krr_weights.T @ (K_SSp * KME_mat) - self.reference
 
     def _nystroem_transform_subset(
-        self, X: np.ndarray, subset_kernel: SubsetKernel, active_indices: np.ndarray
+        self, X: np.ndarray, subset_kernel: SubsetKernel
     ) -> Tensor:
         """Apply Nyström transformation with a subset kernel.
 
@@ -138,7 +138,6 @@ class RKHSSHAPApprox:
             .cholesky()
             .inv_matmul(subset_kernel(self.nystroem.landmarks, X_tensor).evaluate())
         )
-
         return ZT.T
 
     def _value_observation(self, z: np.ndarray, X_test: np.ndarray) -> Tensor:

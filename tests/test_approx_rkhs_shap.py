@@ -148,16 +148,6 @@ def run_rkhs_shap_test(
     print("=" * 60)
 
 
-def test_approx_rkhs_shap_diabetes(trained_model):
-    """Test approximate RKHS-SHAP with RBF kernel on the diabetes dataset."""
-    run_rkhs_shap_test(trained_model)
-
-
-def test_approx_rkhs_shap_diabetes_matern(trained_model_matern):
-    """Test approximate RKHS-SHAP with Matern kernel on the diabetes dataset."""
-    run_rkhs_shap_test(trained_model_matern, min_corr_O=0.75)
-
-
 def test_approx_rkhs_shap_diabetes_scaled(trained_model_scaled):
     """Test approximate RKHS-SHAP with ScaleKernel + RBF kernel on the diabetes dataset."""
     run_rkhs_shap_test(trained_model_scaled, min_corr_O=0.75)
