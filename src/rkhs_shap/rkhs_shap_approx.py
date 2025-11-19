@@ -182,7 +182,7 @@ class RKHSSHAPApprox:
 
     def fit(
         self,
-        X_test: Tensor | np.ndarray,
+        X_test: Tensor,
         method: str,
         sample_method: str,
         num_samples: int = 100,
@@ -203,9 +203,6 @@ class RKHSSHAPApprox:
         Returns:
             SHAP values of shape (n_test, m)
         """
-        if isinstance(X_test, Tensor):
-            X_test = X_test.numpy()
-
         if sample_method == "MC":
             Z = large_scale_sample_alternative(self.m, num_samples)
         elif sample_method == "MC2":

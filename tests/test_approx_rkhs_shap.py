@@ -163,38 +163,5 @@ def test_approx_rkhs_shap_diabetes_scaled(trained_model_scaled):
     run_rkhs_shap_test(trained_model_scaled, min_corr_O=0.75)
 
 
-def test_approx_accepts_tensor_and_array(trained_model):
-    """Test that approximate RKHS-SHAP accepts both Tensor and ndarray inputs."""
-    gp, X_train, y_train = trained_model
-
-    rkhs_shap = RKHSSHAPApprox(
-        X=X_train,
-        y=y_train,
-        kernel=gp.covar_module,
-        noise_var=gp.likelihood.noise.detach().cpu().float(),
-        cme_reg=CME_REGULARIZATION,
-        n_components=N_COMPONENTS,
-    )
-
-    X_explain = X_train[:5]
-
-    # Test with Tensor
-    shap_values_tensor = rkhs_shap.fit(
-        X_test=X_explain,
-        method="I",
-        sample_method="full",
-    )
-
-    # Test with ndarray
-    shap_values_array = rkhs_shap.fit(
-        X_test=X_explain.numpy(),
-        method="I",
-        sample_method="full",
-    )
-
-    # Results should be the same
-    np.testing.assert_allclose(shap_values_tensor, shap_values_array, rtol=1e-5)
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
