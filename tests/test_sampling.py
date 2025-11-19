@@ -3,7 +3,6 @@ import pytest
 
 from rkhs_shap.sampling import (
     _get_weights,
-    _propose_func,
     generate_full_Z,
     generate_samples_Z,
     large_scale_sample_alternative,
@@ -62,21 +61,6 @@ def test_get_weights_boundary():
 
     assert weight_low > 0
     assert weight_high > 0
-
-
-def test_propose_func():
-    np.random.seed(42)
-    z = np.array([1, -1, 1, -1, 1])
-    z_original = z.copy()
-
-    z_proposed = _propose_func(z)
-
-    assert z_proposed is z
-
-    diff = (z_proposed != z_original).sum()
-    assert diff == 1
-
-    assert set(z_proposed) == {1, -1}
 
 
 @pytest.mark.parametrize("m,mcmc_run,warm_up_cut", [(3, 50, 10), (5, 100, 20)])

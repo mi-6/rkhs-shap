@@ -53,7 +53,9 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         K_train = Z @ Z.T
 
         krr_weights: Tensor = (
-            to_linear_operator(K_train).add_diagonal(noise_var).solve(self.y.reshape(-1, 1))
+            to_linear_operator(K_train)
+            .add_diagonal(noise_var)
+            .solve(self.y.reshape(-1, 1))
         )
 
         self.krr_weights = krr_weights.reshape(-1, 1)
@@ -164,6 +166,8 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         K_Sc = Z_Sc @ Z_Sc.T
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
-        Xi_S = to_linear_operator(Z_S.T @ Z_S).add_diagonal(self.cme_reg).solve(Z_S_new.T)
+        Xi_S = (
+            to_linear_operator(Z_S.T @ Z_S).add_diagonal(self.cme_reg).solve(Z_S_new.T)
+        )
 
         return self.krr_weights.T @ (K_SSp * (K_Sc @ Z_S @ Xi_S)) - self.reference

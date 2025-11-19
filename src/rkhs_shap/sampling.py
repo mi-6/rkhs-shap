@@ -113,23 +113,6 @@ def _get_weights(s: int, m: int) -> float:
     return (m - 1) / (binom(m, s) * s * (m - s))
 
 
-def _propose_func(z: np.ndarray) -> np.ndarray:
-    """Propose a new MCMC state by flipping one element.
-
-    WARNING: This function modifies z in-place.
-
-    Args:
-        z: Current state vector with values in {-1, 1}
-
-    Returns:
-        The modified array (same object as input)
-    """
-    m = len(z)
-    index = np.random.choice(m)
-    z[index] = -z[index]
-    return z
-
-
 def generate_samples_Z(m: int, mcmc_run: int, warm_up_cut: int) -> np.ndarray:
     """Generate Samples of zs' for the KS4K
 
@@ -141,43 +124,42 @@ def generate_samples_Z(m: int, mcmc_run: int, warm_up_cut: int) -> np.ndarray:
     Returns:
         Z: samples of zs' for KS4K returned as the Z matrix in KernelSHAP
     """
-    z_init = np.array([np.random.choice([1, -1]) for _ in range(m)])
-    z_vec = []
+    z_init = np.random.choice([1, -1], size=m)
+    z_vec: list[np.ndarray] = []
     z_vec.append(z_init)
 
     count = 0
     while count <= mcmc_run:
-        propose = _propose_func(z_vec[count].copy())
+        current = z_vec[count]
+        index = np.random.randint(m)
+        propose = current.copy()
+        propose[index] = -propose[index]
         propose_s = (propose == 1).sum()
-        current_s = (z_vec[count] == 1).sum()
+        current_s = (current == 1).sum()
 
         # These two cases should have probability 0 reaching there
         if propose_s == m or propose_s == 0:
             continue
         else:
             # the alpha score in MCMC
-            a_t = np.min(
-                [
-                    1,
-                    _get_weights(int(propose_s), int(m))
-                    / _get_weights(int(current_s), int(m)),
-                ]
+            a_t = min(
+                1.0,
+                _get_weights(int(propose_s), int(m))
+                / _get_weights(int(current_s), int(m)),
             )
 
-            flip = np.random.uniform()
-
-            if flip <= a_t:
+            if np.random.uniform() <= a_t:
                 # Append the proposed one
                 z_vec.append(propose)
                 count += 1
             else:
                 # Append the current one
-                z_vec.append(z_vec[count])
+                z_vec.append(current)
                 count += 1
 
     z_vec = z_vec[warm_up_cut:]
     z_vec.append(np.ones_like(propose))
     z_vec.append(-np.ones_like(propose))
-    z_vec = (np.array(z_vec) + 1) / 2
+    z_arr = (np.array(z_vec) + 1) / 2
 
-    return z_vec.astype(np.bool_)
+    return z_arr.astype(np.bool_)

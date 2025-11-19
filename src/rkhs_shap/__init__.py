@@ -6,7 +6,6 @@ from rkhs_shap.rkhs_shap_approx import RKHSSHAPApprox
 from rkhs_shap.rkhs_shap_exact import RKHSSHAP
 from rkhs_shap.shapley_regulariser import ShapleyRegulariser
 
-
 __all__ = [
     "RKHSSHAP",
     "RKHSSHAPApprox",
