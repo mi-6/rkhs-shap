@@ -29,7 +29,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
-    def predict(self, x: torch.Tensor) -> gpytorch.distributions.MultivariateNormal:
+    def predict(self, x: torch.Tensor) -> torch.distributions.Distribution:
         self.eval()
         self.likelihood.eval()
         with torch.no_grad():

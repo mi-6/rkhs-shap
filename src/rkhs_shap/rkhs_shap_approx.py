@@ -38,10 +38,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         """
         self.n, self.m = X.shape
         self.X, self.y = X.float(), y
-
-        noise_var = to_tensor(noise_var)
-        cme_reg = to_tensor(cme_reg)
-        self.cme_reg = cme_reg
+        self.cme_reg = to_tensor(cme_reg)
 
         self.kernel = deepcopy(kernel)
         freeze_parameters(self.kernel)
@@ -54,7 +51,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
 
         krr_weights: Tensor = (
             to_linear_operator(K_train)
-            .add_diagonal(noise_var)
+            .add_diagonal(to_tensor(noise_var))
             .solve(self.y.reshape(-1, 1))
         )
 

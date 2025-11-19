@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Sequence, Union
+from typing import Sequence, Union
 
 import numpy as np
 import torch
@@ -43,8 +43,9 @@ class SubsetKernel(Kernel):
             )
 
         self.base_kernel = deepcopy(base_kernel)
-        subset_dims = torch.as_tensor(subset_dims, dtype=torch.int)
-        self.register_buffer("subset_dims", subset_dims)
+        self.register_buffer(
+            "subset_dims", torch.as_tensor(subset_dims, dtype=torch.int)
+        )
         self._subset_kernel_params(self.base_kernel)
 
     def _subset_kernel_params(self, kernel: Kernel) -> None:
@@ -91,7 +92,8 @@ class SubsetKernel(Kernel):
         x1: Tensor,
         x2: Tensor,
         diag: bool = False,
-        **params: Any,
+        last_dim_is_batch: bool = False,
+        **params,
     ) -> Union[Tensor, LazyEvaluatedKernelTensor]:
         """
         Evaluate kernel on subsetted input dimensions.
@@ -108,4 +110,4 @@ class SubsetKernel(Kernel):
         x1 = x1[..., self.subset_dims]
         x2 = x2[..., self.subset_dims]
 
-        return self.base_kernel(x1, x2, diag=diag, **params)
+        return self.base_kernel(x1, x2, diag=diag, last_dim_is_batch=last_dim_is_batch, **params)
