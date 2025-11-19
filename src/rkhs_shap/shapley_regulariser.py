@@ -131,9 +131,9 @@ class ShapleyRegulariser(object):
 
     def fit(
         self,
-        X: float,
-        y: float,
-        ls: float,
+        X: np.ndarray | torch.Tensor,
+        y: np.ndarray | torch.Tensor,
+        ls: np.ndarray | torch.Tensor,
         features_index: list,
         method: str = "O",
         num_samples: int = 300,

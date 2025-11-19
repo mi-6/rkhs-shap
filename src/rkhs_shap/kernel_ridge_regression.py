@@ -63,7 +63,7 @@ class KernelRidgeRegressor(object):
 
         # Store optimal parameters
         self.k = model.covar_module
-        self.k.raw_lengthscale.require_grad = False
+        self.k.raw_lengthscale.requires_grad = False
         self.lmda = to_tensor(model.likelihood.noise.item())
 
         # Create alphas

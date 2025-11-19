@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Any, Sequence, Union
 
+import numpy as np
 import torch
 from gpytorch.kernels import Kernel
 from gpytorch.lazy import LazyEvaluatedKernelTensor
@@ -33,7 +34,7 @@ class SubsetKernel(Kernel):
     def __init__(
         self,
         base_kernel: Kernel,
-        subset_dims: Sequence[int],
+        subset_dims: Sequence[int] | np.ndarray,
     ) -> None:
         super().__init__()
         if base_kernel.active_dims is not None:

@@ -23,8 +23,8 @@ dev = [
 ]
 
 [tool.pyright]
-# include = ["src", "tests"]
-include = ["tests"]
+include = ["src", "tests"]
+# include = ["tests"]
 # reportUnknownMemberType = false
 # reportUnknownArgumentType = false
 # reportUnknownVariableType = false
