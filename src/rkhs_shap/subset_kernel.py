@@ -110,4 +110,6 @@ class SubsetKernel(Kernel):
         x1 = x1[..., self.subset_dims]
         x2 = x2[..., self.subset_dims]
 
-        return self.base_kernel(x1, x2, diag=diag, last_dim_is_batch=last_dim_is_batch, **params)
+        return self.base_kernel(
+            x1, x2, diag=diag, last_dim_is_batch=last_dim_is_batch, **params
+        )

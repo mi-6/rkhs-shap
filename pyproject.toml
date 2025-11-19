@@ -24,11 +24,18 @@ dev = [
 
 [tool.pyright]
 include = ["src", "tests"]
-# Disable errors from incomplete GPyTorch type stubs
-# reportArgumentType = false
-# reportAttributeAccessIssue = false
-# reportOperatorIssue = false
-# reportReturnType = false
+typeCheckingMode = "standard"
+reportUnusedVariable = "error"
+# TODO: Re-enable some of these reports if possible
+reportArgumentType = false
+reportAttributeAccessIssue = false
+reportOperatorIssue = false
+reportReturnType = false
+reportOptionalMemberAccess = false
+reportCallIssue = false
+reportIndexIssue = false
+reportGeneralTypeIssues = false
+
 
 [build-system]
 requires = ["uv_build>=0.9.10,<0.10.0"]
