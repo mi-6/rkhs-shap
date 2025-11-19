@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from gpytorch.kernels import Kernel
 from sklearn.cluster import KMeans
@@ -25,17 +24,18 @@ class Nystroem:
         self.n_components = n_components
         self.landmarks = None
 
-    def fit(self, X: np.ndarray) -> None:
+    def fit(self, X: Tensor) -> None:
         """Fit landmark points using KMeans clustering.
 
         Args:
             X: Training data of shape (n, m)
         """
+        X_tensor = to_tensor(X)
         km = KMeans(n_clusters=self.n_components, random_state=0)
-        km.fit(X)
+        km.fit(X_tensor.cpu().numpy())
         self.landmarks = torch.tensor(km.cluster_centers_, dtype=torch.float32)
 
-    def transform(self, X: np.ndarray) -> Tensor:
+    def transform(self, X: Tensor) -> Tensor:
         """Transform data using Nyström approximation.
 
         Args:
@@ -59,7 +59,7 @@ class Nystroem:
 
         return ZT.T
 
-    def compute_kernel(self, X: np.ndarray) -> Tensor:
+    def compute_kernel(self, X: Tensor) -> Tensor:
         """Compute approximated kernel matrix.
 
         Args:

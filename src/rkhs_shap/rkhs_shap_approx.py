@@ -48,8 +48,8 @@ class RKHSSHAPApprox(RKHSSHAPBase):
 
         # Run Nyström approximation and Kernel Ridge Regression
         self.nystroem = Nystroem(kernel=self.kernel, n_components=n_components)
-        self.nystroem.fit(self.X.numpy())
-        Z = self.nystroem.transform(self.X.numpy())
+        self.nystroem.fit(self.X)
+        Z = self.nystroem.transform(self.X)
         K_train = Z @ Z.T
 
         krr_weights: Tensor = (
@@ -66,7 +66,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         self.reference = self.ypred.mean().item()
         self.Z = Z
 
-    def _value_intervention(self, z: np.ndarray, X_test: np.ndarray) -> Tensor:
+    def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
 
         Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
@@ -101,18 +101,18 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
 
         # Transform using Nyström with subsetted data
-        Z_S = self._nystroem_transform_subset(self.X.numpy(), S_kernel)
+        Z_S = self._nystroem_transform_subset(self.X, S_kernel)
         Z_S_new = self._nystroem_transform_subset(X_test, S_kernel)
         K_SSp = Z_S @ Z_S_new.T
 
-        Z_Sc = self._nystroem_transform_subset(self.X.numpy(), Sc_kernel)
+        Z_Sc = self._nystroem_transform_subset(self.X, Sc_kernel)
         K_Sc = Z_Sc @ Z_Sc.T
         KME_mat = K_Sc.mean(dim=1, keepdim=True).repeat(1, n_test)
 
         return self.krr_weights.T @ (K_SSp * KME_mat) - self.reference
 
     def _nystroem_transform_subset(
-        self, X: np.ndarray, subset_kernel: SubsetKernel
+        self, X: Tensor, subset_kernel: SubsetKernel
     ) -> Tensor:
         """Apply Nyström transformation with a subset kernel.
 
@@ -131,7 +131,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         )
         return ZT.T
 
-    def _value_observation(self, z: np.ndarray, X_test: np.ndarray) -> Tensor:
+    def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute observational Shapley value function for coalition z.
 
         Computes E[f(X) | X_S = x_S] - E[f(X)] where S is the coalition defined by z.
@@ -158,11 +158,11 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         S_kernel = SubsetKernel(self.kernel, subset_dims=S)
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
 
-        Z_S = self._nystroem_transform_subset(self.X.numpy(), S_kernel)
+        Z_S = self._nystroem_transform_subset(self.X, S_kernel)
         Z_S_new = self._nystroem_transform_subset(X_test, S_kernel)
         K_SSp = Z_S @ Z_S_new.T
 
-        Z_Sc = self._nystroem_transform_subset(self.X.numpy(), Sc_kernel)
+        Z_Sc = self._nystroem_transform_subset(self.X, Sc_kernel)
         K_Sc = Z_Sc @ Z_Sc.T
 
         # Conditional Mean Embedding operator: maps complement features to coalition features

@@ -11,6 +11,7 @@ from rkhs_shap.sampling import (
     generate_full_Z,
     large_scale_sample_alternative,
 )
+from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import to_tensor
 
 
@@ -53,6 +54,7 @@ class ShapleyRegulariser(object):
 
         self.Z = None
         self.nystroem = None
+        self.kernel = None
 
     def _get_int_embedding(self, z, X):
         """
@@ -67,10 +69,16 @@ class ShapleyRegulariser(object):
         elif z.sum() == 0:
             return (self.Kx.mean(axis=1) * torch.ones((n, n))).T
         else:
-            Z_S = self.nystroem.transform(X, active_dims=z)
+            S = np.where(z)[0]
+            Sc = np.where(zc)[0]
+
+            S_kernel = SubsetKernel(self.kernel, subset_dims=S)
+            Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+
+            Z_S = self._nystroem_transform_subset(X, S_kernel)
             K_SS = Z_S @ Z_S.T
 
-            Z_Sc = self.nystroem.transform(X, active_dims=zc)
+            Z_Sc = self._nystroem_transform_subset(X, Sc_kernel)
             K_Sc = Z_Sc @ Z_Sc.T
 
             KME_mat = K_Sc.mean(axis=1)[:, np.newaxis] * torch.ones((n, n))
@@ -90,10 +98,16 @@ class ShapleyRegulariser(object):
         elif z.sum() == 0:
             return self.Kx.mean(axis=1) * torch.ones((n, n)).T
         else:
-            Z_S = self.nystroem.transform(X, active_dims=z)
+            S = np.where(z)[0]
+            Sc = np.where(zc)[0]
+
+            S_kernel = SubsetKernel(self.kernel, subset_dims=S)
+            Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+
+            Z_S = self._nystroem_transform_subset(X, S_kernel)
             K_SS = Z_S @ Z_S.T
 
-            Z_Sc = self.nystroem.transform(X, active_dims=zc)
+            Z_Sc = self._nystroem_transform_subset(X, Sc_kernel)
             cme_latter_part = (
                 to_linear_operator(Z_S.T @ Z_S)
                 .add_diagonal(to_tensor(self.lambda_cme))
@@ -102,6 +116,18 @@ class ShapleyRegulariser(object):
             holder = K_SS * (Z_Sc @ Z_Sc.T @ Z_S @ cme_latter_part)
 
             return holder
+
+    def _nystroem_transform_subset(self, X, subset_kernel: SubsetKernel):
+        """Apply Nyström transformation with a subset kernel."""
+        X_tensor = to_tensor(X)
+
+        ZT = (
+            subset_kernel(self.nystroem.landmarks)
+            .add_jitter()
+            .cholesky()
+            .solve(subset_kernel(self.nystroem.landmarks, X_tensor).to_dense())
+        )
+        return ZT.T
 
     def fit(
         self,
@@ -132,10 +158,11 @@ class ShapleyRegulariser(object):
         rbf = RBFKernel()
         rbf.lengthscale = to_tensor(ls)
         rbf.raw_lengthscale.requires_grad = False
+        self.kernel = rbf
 
         ny = Nystroem(kernel=rbf, n_components=self.n_components)
-        ny.fit(self.X)
-        Phi = ny.transform(self.X)
+        ny.fit(to_tensor(self.X))
+        Phi = ny.transform(to_tensor(self.X))
         self.Z = Phi
         Kx = Phi @ Phi.T
 
@@ -194,7 +221,7 @@ class ShapleyRegulariser(object):
 
     def predict(self, X_test):
         # obtain kernel K_{test, train} first
-        Z_test = self.nystroem.transform(X_test)
+        Z_test = self.nystroem.transform(to_tensor(X_test))
         K_xpx = Z_test @ self.Z.T
 
         return K_xpx @ self.alphas
