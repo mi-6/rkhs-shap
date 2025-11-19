@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import torch
 from gpytorch.kernels import RBFKernel
-from gpytorch.lazy import lazify
+from linear_operator.operators import to_linear_operator
 from tqdm import tqdm
 
 from rkhs_shap.kernel_approx import Nystroem
@@ -94,9 +94,9 @@ class ShapleyRegulariser(object):
 
             Z_Sc = self.nystroem.transform(X, active_dims=zc)
             cme_latter_part = (
-                lazify(Z_S.T @ Z_S)
-                .add_diag(torch.tensor(self.lambda_cme).float())
-                .inv_matmul(Z_S.T)
+                to_linear_operator(Z_S.T @ Z_S)
+                .add_diagonal(torch.tensor(self.lambda_cme).float())
+                .solve(Z_S.T)
             )
             holder = K_SS * (Z_Sc @ Z_Sc.T @ Z_S @ cme_latter_part)
 
@@ -174,13 +174,13 @@ class ShapleyRegulariser(object):
 
         # Formulate the regression
         y_ten = torch.tensor(y).reshape(-1, 1).float()
-        A = lazify(torch.tensor(A).float())
+        A = to_linear_operator(torch.tensor(A).float())
         self.AAt = A @ A.t()
         K = rbf(torch.tensor(X / ls)).float()
         alphas = (
             (K @ K + self.lambda_krr * K + self.lambda_sv * self.AAt)
             .add_jitter()
-            .inv_matmul(K.matmul(y_ten))
+            .solve(K.matmul(y_ten))
         )
 
         self.alphas = alphas

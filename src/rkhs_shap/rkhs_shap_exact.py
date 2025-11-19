@@ -44,7 +44,7 @@ class RKHSSHAP(RKHSSHAPBase):
 
         # Run Kernel Ridge Regression
         K_train = self.kernel(self.X)
-        krr_weights: Tensor = K_train.add_diag(noise_var).inv_matmul(self.y)
+        krr_weights: Tensor = K_train.add_diagonal(noise_var).solve(self.y)
 
         self.krr_weights = krr_weights.reshape(-1, 1)
         self.ypred = K_train @ krr_weights
@@ -87,7 +87,7 @@ class RKHSSHAP(RKHSSHAPBase):
 
         if z.sum() == self.m:
             # If all features are active, return full prediction
-            ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).evaluate()
+            ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).to_dense()
             return ypred_test - self.reference
 
         # Naming conventions:
@@ -97,8 +97,8 @@ class RKHSSHAP(RKHSSHAPBase):
         # Sc (S complement) is the complement set - features NOT in S
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
-        K_SSp = S_kernel(self.X, X_test).evaluate().float()
-        K_Sc = Sc_kernel(self.X, self.X).evaluate()
+        K_SSp = S_kernel(self.X, X_test).to_dense().float()
+        K_Sc = Sc_kernel(self.X, self.X).to_dense()
         KME_mat = K_Sc.mean(axis=1, keepdim=True).repeat(1, n_test)
 
         return self.krr_weights.T @ (K_SSp * KME_mat) - self.reference
@@ -120,16 +120,16 @@ class RKHSSHAP(RKHSSHAPBase):
             return 0
 
         if z.sum() == self.m:
-            ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).evaluate()
+            ypred_test = self.krr_weights.T @ self.kernel(self.X, X_test).to_dense()
             return ypred_test - self.reference
 
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
-        K_SSp = S_kernel(self.X, X_test).evaluate().float()
+        K_SSp = S_kernel(self.X, X_test).to_dense().float()
         K_Sc = Sc_kernel(self.X, self.X)
         K_SS = S_kernel(self.X, self.X)
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
-        Xi_S = (K_SS.add_diag(self.n * self.cme_reg).inv_matmul(K_Sc.evaluate())).T
+        Xi_S = (K_SS.add_diagonal(self.n * self.cme_reg).solve(K_Sc.to_dense())).T
 
         return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - self.reference

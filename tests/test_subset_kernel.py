@@ -31,7 +31,7 @@ def test_subset_kernel_rbf():
     squared_distances = torch.cdist(x_scaled, x_scaled, p=2).pow(2)
     kernel_expected = base_kernel.outputscale * torch.exp(-0.5 * squared_distances)
 
-    kernel_actual = subset_kernel(x, x).evaluate()
+    kernel_actual = subset_kernel(x, x).to_dense()
 
     max_error = (kernel_expected - kernel_actual).abs().max().item()
     assert max_error < 1e-6, f"Error too large: {max_error}"
@@ -62,7 +62,7 @@ def test_subset_kernel_different_input_shapes():
     n1, n2 = 4, 6
     x1 = torch.randn(n1, 5)
     x2 = torch.randn(n2, 5)
-    kernel_matrix = subset_kernel(x1, x2).evaluate()
+    kernel_matrix = subset_kernel(x1, x2).to_dense()
     assert kernel_matrix.shape == (n1, n2)
 
 
@@ -95,7 +95,7 @@ def test_subset_kernel_with_matern_kernel():
     x = torch.randn(n_samples, input_dim)
 
     # Compute kernel matrix using SubsetKernel
-    kernel_actual = subset_kernel(x, x).evaluate()
+    kernel_actual = subset_kernel(x, x).to_dense()
 
     # Compute expected kernel matrix manually
     x_subset = x[:, subset_dims]
@@ -106,7 +106,7 @@ def test_subset_kernel_with_matern_kernel():
         nu=2.5, ard_num_dims=len(subset_dims)
     )
     expected_kernel.lengthscale = lengthscales_subset
-    kernel_expected = expected_kernel(x_subset, x_subset).evaluate()
+    kernel_expected = expected_kernel(x_subset, x_subset).to_dense()
 
     # Check that SubsetKernel produces the same result as manual computation
     max_error = (kernel_expected - kernel_actual).abs().max().item()

@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 import torch
 from gpytorch.kernels import Kernel
-from gpytorch.lazy import lazify
+from linear_operator.operators import to_linear_operator
 from torch import Tensor
 
 from rkhs_shap.kernel_approx import Nystroem
@@ -53,7 +53,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         K_train = Z @ Z.T
 
         krr_weights: Tensor = (
-            lazify(K_train).add_diag(noise_var).inv_matmul(self.y.reshape(-1, 1))
+            to_linear_operator(K_train).add_diagonal(noise_var).solve(self.y.reshape(-1, 1))
         )
 
         self.krr_weights = krr_weights.reshape(-1, 1)
@@ -125,7 +125,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
             subset_kernel(self.nystroem.landmarks)
             .add_jitter()
             .cholesky()
-            .inv_matmul(subset_kernel(self.nystroem.landmarks, X_tensor).evaluate())
+            .solve(subset_kernel(self.nystroem.landmarks, X_tensor).to_dense())
         )
         return ZT.T
 
@@ -164,6 +164,6 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         K_Sc = Z_Sc @ Z_Sc.T
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
-        Xi_S = lazify(Z_S.T @ Z_S).add_diag(self.cme_reg).inv_matmul(Z_S_new.T)
+        Xi_S = to_linear_operator(Z_S.T @ Z_S).add_diagonal(self.cme_reg).solve(Z_S_new.T)
 
         return self.krr_weights.T @ (K_SSp * (K_Sc @ Z_S @ Xi_S)) - self.reference
