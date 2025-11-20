@@ -16,10 +16,12 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "jupyter>=1.1.1",
     "matplotlib>=3",
     "pyright>=1.1.407",
     "pytest>=9",
     "ruff>=0.14",
+    "seaborn>=0.13.2",
 ]
 
 [tool.pyright]
