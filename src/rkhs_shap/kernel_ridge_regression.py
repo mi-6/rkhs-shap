@@ -67,8 +67,9 @@ class KernelRidgeRegressor(object):
         self.lmda = to_tensor(model.likelihood.noise.item())
 
         # Create alphas
-        Kxx = self.k(self.X)
-        self.alpha = Kxx.add_diagonal(self.lmda).solve(self.y)
+        Kxx = self.k(self.X).to_dense()
+        n = Kxx.shape[0]
+        self.alpha = torch.linalg.solve(Kxx + self.lmda * torch.eye(n), self.y)
 
         self.flip_switch = 1
 

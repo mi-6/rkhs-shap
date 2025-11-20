@@ -11,12 +11,26 @@ from rkhs_shap.sampling import (
     large_scale_sample_alternative,
     subset_full_Z,
 )
+from rkhs_shap.utils import calculate_additivity_mae
 
 
 class RKHSSHAPBase(ABC):
     """Base class with shared fit method for RKHS-SHAP implementations"""
 
     m: int
+    reference: float
+
+    @abstractmethod
+    def predict(self, X_test: Tensor) -> Tensor:
+        """Predict using the fitted KRR model.
+
+        Args:
+            X_test: Test points of shape (n_test, m)
+
+        Returns:
+            Predictions of shape (n_test,) or (n_test, 1)
+        """
+        ...
 
     @abstractmethod
     def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
@@ -99,7 +113,18 @@ class RKHSSHAPBase(ABC):
 
             count += 1
 
+        # clf = Ridge(wls_reg, solver="sag")
         clf = Ridge(wls_reg)
         clf.fit(Z, Y_target, sample_weight=weights)
 
-        return clf.coef_
+        shap_values = clf.coef_
+        # TODO: decide if MAE calculation should be included.
+        model_preds = self.predict(X_test)
+        mae = calculate_additivity_mae(
+            shap_values=shap_values,
+            model_preds=model_preds,
+            baseline=self.reference,
+        )
+        print(f"Additivity MAE: {mae:.6f}")
+
+        return shap_values
