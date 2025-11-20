@@ -34,11 +34,12 @@ def train_gp_model(
     X_train: np.ndarray,
     y_train: np.ndarray,
     covar_module: gpytorch.kernels.Kernel | None = None,
+    training_iter: int = 50,
 ) -> tuple[ExactGPModel, torch.Tensor, torch.Tensor]:
     X_train_tensor = to_tensor(X_train)
     y_train_tensor = to_tensor(y_train)
     gp = ExactGPModel(X_train_tensor, y_train_tensor, covar_module=covar_module)
-    gp.fit()
+    gp.fit(training_iter=training_iter)
     return gp, X_train_tensor, y_train_tensor
 
 

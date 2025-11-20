@@ -68,6 +68,13 @@ def trained_model_unscaled_data_rbf(diabetes_data):
     return train_gp_model(X_unscaled, y_unscaled)
 
 
+@pytest.fixture
+def trained_model_underfit(diabetes_data):
+    """Train an underfit GP model with only 1 training iteration."""
+    X_train, y_train = get_train_subset(diabetes_data)
+    return train_gp_model(X_train, y_train, training_iter=1)
+
+
 def run_rkhs_shap_test(
     trained_model: tuple[ExactGPModel, torch.Tensor, torch.Tensor],
     min_corr_O: float = DEFAULT_MIN_OBSERVATIONAL_CORRELATION,
@@ -179,12 +186,17 @@ def test_exact_rkhs_shap_diabetes_scaled(trained_model_scale_kernel):
 
 
 def test_exact_rkhs_shap_diabetes_unscaled(trained_model_unscaled_data_rbf):
-    """Test exact RKHS-SHAP with RBF kernel on unscaled dataset.
-
-    This test verifies RKHS-SHAP works with features that have different scales
-    and offsets, which is important since RBF kernels are sensitive to feature scaling.
-    """
+    """Test exact RKHS-SHAP with RBF kernel on unscaled dataset."""
     run_rkhs_shap_test(trained_model_unscaled_data_rbf, min_corr_O=0.6)
+
+
+def test_exact_rkhs_shap_diabetes_underfit(trained_model_underfit):
+    """Test exact RKHS-SHAP with an underfit model trained for only 1 iteration.
+
+    This test verifies RKHS-SHAP works with poorly trained models that haven't
+    converged, which may have suboptimal hyperparameters and poor predictions.
+    """
+    run_rkhs_shap_test(trained_model_underfit, min_corr_O=0.83)
 
 
 if __name__ == "__main__":
