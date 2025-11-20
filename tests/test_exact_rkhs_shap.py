@@ -38,13 +38,34 @@ def trained_model_matern(diabetes_data):
 
 
 @pytest.fixture
-def trained_model_scaled(diabetes_data):
+def trained_model_scale_kernel(diabetes_data):
     """Train a GP model with ScaleKernel + RBF kernel on the diabetes dataset."""
-    X_train, y_train = get_train_subset(diabetes_data)
-    scaled_kernel = gpytorch.kernels.ScaleKernel(
-        gpytorch.kernels.RBFKernel(ard_num_dims=X_train.shape[1])
+    X_train_scaled, y_train = get_train_subset(diabetes_data)
+    X_unscaled = X_train_scaled * np.array(
+        [100.0, 50.0, 200.0, 10.0, 5.0, 30.0, 80.0, 150.0, 20.0, 40.0]
     )
-    return train_gp_model(X_train, y_train, covar_module=scaled_kernel)
+    X_unscaled = X_unscaled + np.array(
+        [50.0, -20.0, 100.0, 5.0, 2.0, 10.0, 40.0, 80.0, 10.0, 20.0]
+    )
+    y_unscaled = y_train * 2.5 + 10.0
+    scaled_kernel = gpytorch.kernels.ScaleKernel(
+        gpytorch.kernels.RBFKernel(ard_num_dims=X_unscaled.shape[1])
+    )
+    return train_gp_model(X_unscaled, y_unscaled, covar_module=scaled_kernel)
+
+
+@pytest.fixture
+def trained_model_unscaled_data_rbf(diabetes_data):
+    """Train a GP model with RBF kernel on unscaled diabetes dataset."""
+    X_train_scaled, y_train = get_train_subset(diabetes_data)
+    X_unscaled = X_train_scaled * np.array(
+        [100.0, 50.0, 200.0, 10.0, 5.0, 30.0, 80.0, 150.0, 20.0, 40.0]
+    )
+    X_unscaled = X_unscaled + np.array(
+        [50.0, -20.0, 100.0, 5.0, 2.0, 10.0, 40.0, 80.0, 10.0, 20.0]
+    )
+    y_unscaled = y_train * 2.5 + 10.0
+    return train_gp_model(X_unscaled, y_unscaled)
 
 
 def run_rkhs_shap_test(
@@ -152,9 +173,18 @@ def test_exact_rkhs_shap_diabetes_matern(trained_model_matern):
     run_rkhs_shap_test(trained_model_matern, min_corr_O=0.83)
 
 
-def test_exact_rkhs_shap_diabetes_scaled(trained_model_scaled):
+def test_exact_rkhs_shap_diabetes_scaled(trained_model_scale_kernel):
     """Test exact RKHS-SHAP with ScaleKernel + RBF kernel on the diabetes dataset."""
-    run_rkhs_shap_test(trained_model_scaled, min_corr_O=0.83)
+    run_rkhs_shap_test(trained_model_scale_kernel, min_corr_O=0.65)
+
+
+def test_exact_rkhs_shap_diabetes_unscaled(trained_model_unscaled_data_rbf):
+    """Test exact RKHS-SHAP with RBF kernel on unscaled dataset.
+
+    This test verifies RKHS-SHAP works with features that have different scales
+    and offsets, which is important since RBF kernels are sensitive to feature scaling.
+    """
+    run_rkhs_shap_test(trained_model_unscaled_data_rbf, min_corr_O=0.6)
 
 
 if __name__ == "__main__":
