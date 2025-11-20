@@ -46,7 +46,7 @@ class RKHSSHAP(RKHSSHAPBase):
 
         self.krr_weights = krr_weights.reshape(-1, 1)
         self.ypred = K_train.to_dense() @ krr_weights
-        self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2).item()
+        self.rmse = torch.sqrt(torch.mean((self.ypred - self.y) ** 2)).item()
         self.reference = self.ypred.mean().item()
 
     def _get_subset_kernels(self, z: np.ndarray):
@@ -80,8 +80,7 @@ class RKHSSHAP(RKHSSHAPBase):
         n_test = X_test.shape[0]
 
         if z.sum() == 0:
-            # If no features are active, return 0
-            return 0
+            return torch.zeros(1, X_test.shape[0])
 
         if z.sum() == self.m:
             # If all features are active, return full prediction
