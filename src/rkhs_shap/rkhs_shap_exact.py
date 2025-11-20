@@ -41,13 +41,27 @@ class RKHSSHAP(RKHSSHAPBase):
         freeze_parameters(self.kernel)
 
         # Run Kernel Ridge Regression
-        K_train = self.kernel(self.X)
-        krr_weights: Tensor = K_train.add_diagonal(to_tensor(noise_var)).solve(self.y)
+        K_train = self.kernel(self.X).to_dense()
+        krr_weights: Tensor = torch.linalg.solve(
+            K_train + noise_var * torch.eye(self.n), self.y
+        )
 
         self.krr_weights = krr_weights.reshape(-1, 1)
-        self.ypred = K_train.to_dense() @ krr_weights
-        self.rmse = torch.sqrt(torch.mean(self.ypred - self.y) ** 2).item()
+        self.ypred = K_train @ krr_weights
+        self.rmse = torch.sqrt(torch.mean((self.ypred - self.y) ** 2)).item()
         self.reference = self.ypred.mean().item()
+
+    def predict(self, X_test: Tensor) -> Tensor:
+        """Predict using the fitted KRR model.
+
+        Args:
+            X_test: Test points of shape (n_test, m)
+
+        Returns:
+            Predictions of shape (n_test,)
+        """
+        K_test = self.kernel(self.X, X_test).to_dense()
+        return (K_test.T @ self.krr_weights).squeeze()
 
     def _get_subset_kernels(self, z: np.ndarray):
         """Extract coalition and complement kernels from binary coalition vector.
@@ -80,8 +94,7 @@ class RKHSSHAP(RKHSSHAPBase):
         n_test = X_test.shape[0]
 
         if z.sum() == 0:
-            # If no features are active, return 0
-            return 0
+            return torch.zeros(1, X_test.shape[0])
 
         if z.sum() == self.m:
             # If all features are active, return full prediction
@@ -124,10 +137,12 @@ class RKHSSHAP(RKHSSHAPBase):
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
         K_SSp = S_kernel(self.X, X_test).to_dense().float()
-        K_Sc = Sc_kernel(self.X, self.X)
-        K_SS = S_kernel(self.X, self.X)
+        K_Sc = Sc_kernel(self.X, self.X).to_dense()
+        K_SS = S_kernel(self.X, self.X).to_dense()
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
-        Xi_S = (K_SS.add_diagonal(self.n * self.cme_reg).solve(K_Sc.to_dense())).T
+        Xi_S = torch.linalg.solve(
+            K_SS + self.n * self.cme_reg * torch.eye(self.n), K_Sc
+        ).T
 
         return self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) - self.reference

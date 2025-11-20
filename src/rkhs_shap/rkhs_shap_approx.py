@@ -3,7 +3,6 @@ from copy import deepcopy
 import numpy as np
 import torch
 from gpytorch.kernels import Kernel
-from linear_operator.operators import to_linear_operator
 from torch import Tensor
 
 from rkhs_shap.kernel_approx import Nystroem
@@ -48,11 +47,10 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         self.nystroem.fit(self.X)
         Z = self.nystroem.transform(self.X)
         K_train = Z @ Z.T
+        n = K_train.shape[0]
 
-        krr_weights: Tensor = (
-            to_linear_operator(K_train)
-            .add_diagonal(to_tensor(noise_var))
-            .solve(self.y.reshape(-1, 1))
+        krr_weights: Tensor = torch.linalg.solve(
+            K_train + noise_var * torch.eye(n), self.y.reshape(-1, 1)
         )
 
         self.krr_weights = krr_weights.reshape(-1, 1)
@@ -62,6 +60,18 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         ).item()
         self.reference = self.ypred.mean().item()
         self.Z = Z
+
+    def predict(self, X_test: Tensor) -> Tensor:
+        """Predict using the fitted KRR model with Nyström approximation.
+
+        Args:
+            X_test: Test points of shape (n_test, m)
+
+        Returns:
+            Predictions of shape (n_test,)
+        """
+        Z_test = self.nystroem.transform(X_test)
+        return (Z_test @ self.Z.T @ self.krr_weights).squeeze()
 
     def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
@@ -163,8 +173,8 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         K_Sc = Z_Sc @ Z_Sc.T
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
-        Xi_S = (
-            to_linear_operator(Z_S.T @ Z_S).add_diagonal(self.cme_reg).solve(Z_S_new.T)
-        )
+        ZS_gram = Z_S.T @ Z_S
+        n_comp = ZS_gram.shape[0]
+        Xi_S = torch.linalg.solve(ZS_gram + self.cme_reg * torch.eye(n_comp), Z_S_new.T)
 
         return self.krr_weights.T @ (K_SSp * (K_Sc @ Z_S @ Xi_S)) - self.reference
