@@ -107,12 +107,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         # S represents which features are "present" or "known" when computing the value function
         # Sp (S prime) refers to test points where we evaluate the value function
         # Sc (S complement) is the complement set - features NOT in S
-        S = np.where(z)[0]
-        Sc = np.where(~z)[0]
-
-        # Create subset kernels for the coalition and its complement
-        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
-        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+        S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
         # Transform using Nyström with subsetted data
         Z_S = self._nystroem_transform_subset(self.X, S_kernel)
@@ -170,12 +165,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
             ).T + self._eval_mean(X_test).unsqueeze(0)
             return ypred_test - self.reference
 
-        S = np.where(z)[0]
-        Sc = np.where(~z)[0]
-
-        # Create subset kernels for the coalition and its complement
-        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
-        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+        S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
         Z_S = self._nystroem_transform_subset(self.X, S_kernel)
         Z_S_new = self._nystroem_transform_subset(X_test, S_kernel)

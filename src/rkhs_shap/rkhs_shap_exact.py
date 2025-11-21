@@ -7,7 +7,6 @@ from gpytorch.kernels import Kernel
 from torch import Tensor
 
 from rkhs_shap.rkhs_shap_base import RKHSSHAPBase
-from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters, to_tensor
 
 
@@ -68,21 +67,6 @@ class RKHSSHAP(RKHSSHAPBase):
         self.ypred = K_train @ krr_weights + mean_train
         self.rmse = torch.sqrt(torch.mean((self.ypred - self.y) ** 2)).item()
         self.reference = self.ypred.mean().item()
-
-    def _get_subset_kernels(self, z: np.ndarray):
-        """Extract coalition and complement kernels from binary coalition vector.
-
-        Args:
-            z: Binary coalition vector of shape (m,) indicating active features
-
-        Returns:
-            Tuple of (S_kernel, Sc_kernel) - SubsetKernel instances for coalition and complement
-        """
-        S = np.where(z)[0]
-        Sc = np.where(~z)[0]
-        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
-        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
-        return S_kernel, Sc_kernel
 
     def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.

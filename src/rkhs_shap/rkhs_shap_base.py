@@ -3,6 +3,7 @@ from typing import Callable
 
 import numpy as np
 import torch
+from gpytorch.kernels import Kernel
 from scipy.special import binom
 from sklearn.linear_model import Ridge
 from torch import Tensor
@@ -13,6 +14,7 @@ from rkhs_shap.sampling import (
     large_scale_sample_alternative,
     subset_full_Z,
 )
+from rkhs_shap.subset_kernel import SubsetKernel
 
 
 class RKHSSHAPBase(ABC):
@@ -21,6 +23,7 @@ class RKHSSHAPBase(ABC):
     m: int
     reference: float
     mean_function: Callable[[Tensor], Tensor]
+    kernel: Kernel
 
     @abstractmethod
     def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
@@ -55,6 +58,21 @@ class RKHSSHAPBase(ABC):
         if mean.dim() == 0:
             mean = mean.repeat(X.shape[0])
         return mean
+
+    def _get_subset_kernels(self, z: np.ndarray):
+        """Extract coalition and complement kernels from binary coalition vector.
+
+        Args:
+            z: Binary coalition vector of shape (m,) indicating active features
+
+        Returns:
+            Tuple of (S_kernel, Sc_kernel) - SubsetKernel instances for coalition and complement
+        """
+        S = np.where(z)[0]
+        Sc = np.where(~z)[0]
+        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
+        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+        return S_kernel, Sc_kernel
 
     def fit(
         self,
