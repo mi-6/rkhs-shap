@@ -124,7 +124,7 @@ class RKHSSHAP(RKHSSHAPBase):
 
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
-        K_SSp = S_kernel(self.X, X_test).to_dense().float()
+        K_SSp = S_kernel(self.X, X_test).to_dense()
         K_Sc = Sc_kernel(self.X, self.X).to_dense()
         K_SS = S_kernel(self.X, self.X).to_dense()
 
