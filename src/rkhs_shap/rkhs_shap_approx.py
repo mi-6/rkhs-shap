@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from copy import deepcopy
 
 import numpy as np
 import torch
@@ -9,7 +8,7 @@ from torch import Tensor
 from rkhs_shap.kernel_approx import Nystroem
 from rkhs_shap.rkhs_shap_base import RKHSSHAPBase
 from rkhs_shap.subset_kernel import SubsetKernel
-from rkhs_shap.utils import freeze_parameters, to_tensor
+from rkhs_shap.utils import to_tensor
 
 
 class RKHSSHAPApprox(RKHSSHAPBase):
@@ -45,15 +44,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
             decomposition to conjugate gradient (CG) solver, which can cause numerical
             differences.
         """
-        self.n, self.m = X.shape
-        self.X, self.y = X.float(), y
-        self.cme_reg = to_tensor(cme_reg)
-        self.mean_function = (
-            mean_function if mean_function else lambda x: torch.zeros(x.shape[0])
-        )
-
-        self.kernel = deepcopy(kernel)
-        freeze_parameters(self.kernel)
+        super().__init__(X, y, kernel, cme_reg, mean_function)
 
         # Run Nyström approximation and Kernel Ridge Regression on residuals
         self.nystroem = Nystroem(kernel=self.kernel, n_components=n_components)
@@ -94,7 +85,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         n_test = X_test.shape[0]
 
         if z.sum() == 0:
-            return 0
+            return torch.zeros(1, X_test.shape[0])
 
         if z.sum() == self.m:
             ypred_test = self.krr_weights.T @ self.Z @ self.nystroem.transform(
@@ -157,7 +148,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
             Value function evaluated at X_test, shape (1, n_test)
         """
         if z.sum() == 0:
-            return 0
+            return torch.zeros(1, X_test.shape[0])
 
         if z.sum() == self.m:
             ypred_test = self.krr_weights.T @ self.Z @ self.nystroem.transform(

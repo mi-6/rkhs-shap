@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from copy import deepcopy
 
 import numpy as np
 import torch
@@ -7,7 +6,6 @@ from gpytorch.kernels import Kernel
 from torch import Tensor
 
 from rkhs_shap.rkhs_shap_base import RKHSSHAPBase
-from rkhs_shap.utils import freeze_parameters, to_tensor
 
 
 class RKHSSHAP(RKHSSHAPBase):
@@ -41,16 +39,7 @@ class RKHSSHAP(RKHSSHAPBase):
             decomposition to conjugate gradient (CG) solver, which can cause numerical
             differences.
         """
-        self.n, self.m = X.shape
-        self.X, self.y = X.float(), y
-
-        self.cme_reg = to_tensor(cme_reg)
-        self.mean_function = (
-            mean_function if mean_function else lambda x: torch.zeros(x.shape[0])
-        )
-
-        self.kernel = deepcopy(kernel)
-        freeze_parameters(self.kernel)
+        super().__init__(X, y, kernel, cme_reg, mean_function)
 
         # Run Kernel Ridge Regression on residuals (y - mean(X))
         K_train = self.kernel(self.X).to_dense()

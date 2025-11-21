@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from collections.abc import Callable
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -15,15 +16,50 @@ from rkhs_shap.sampling import (
     subset_full_Z,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
+from rkhs_shap.utils import freeze_parameters, to_tensor
 
 
 class RKHSSHAPBase(ABC):
     """Base class with shared fit method for RKHS-SHAP implementations"""
 
+    n: int
     m: int
-    reference: float
+    X: Tensor
+    y: Tensor
+    cme_reg: Tensor
     mean_function: Callable[[Tensor], Tensor]
     kernel: Kernel
+    krr_weights: Tensor
+    ypred: Tensor
+    rmse: float
+    reference: float
+
+    def __init__(
+        self,
+        X: Tensor,
+        y: Tensor,
+        kernel: Kernel,
+        cme_reg: float,
+        mean_function: Callable[[Tensor], Tensor] | None = None,
+    ) -> None:
+        """Initialize common RKHS-SHAP attributes.
+
+        Args:
+            X: Training features of shape (n, m)
+            y: Training targets of shape (n,) or (n, 1)
+            kernel: Fitted kernel (e.g., RBFKernel, MaternKernel)
+            cme_reg: Regularization for conditional/marginal mean embeddings
+            mean_function: Optional mean function m(x). If provided, KRR will fit
+                residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
+        """
+        self.n, self.m = X.shape
+        self.X, self.y = X.float(), y.float()
+        self.cme_reg = to_tensor(cme_reg)
+        self.mean_function = (
+            mean_function if mean_function else lambda x: torch.zeros(x.shape[0])
+        )
+        self.kernel = deepcopy(kernel)
+        freeze_parameters(self.kernel)
 
     @abstractmethod
     def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
