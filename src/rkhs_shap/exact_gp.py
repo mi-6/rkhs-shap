@@ -32,7 +32,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def predict(self, x: torch.Tensor) -> torch.distributions.Distribution:
         self.eval()
         self.likelihood.eval()
-        with torch.no_grad():
+        with torch.inference_mode():
             return self.likelihood(self(x))
 
     def predict_mean_numpy(self, x: np.ndarray) -> np.ndarray:

@@ -89,7 +89,7 @@ class RKHSSHAPBase(ABC):
 
     def _eval_mean(self, X: Tensor) -> Tensor:
         """Evaluate mean function with proper shape handling."""
-        with torch.no_grad():
+        with torch.inference_mode():
             mean = self.mean_function(X).detach()
         if mean.dim() == 0:
             mean = mean.repeat(X.shape[0])
@@ -165,7 +165,6 @@ class RKHSSHAPBase(ABC):
 
             count += 1
 
-        # clf = Ridge(wls_reg, solver="sag")
         clf = Ridge(wls_reg)
         clf.fit(Z, Y_target, sample_weight=weights)
 
