@@ -36,6 +36,11 @@ class RKHSSHAP(RKHSSHAPBase):
             mean_function: Optional mean function m(x). If provided, KRR will fit
                 residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
                 Pass model.mean_module from a fitted GP to ensure prediction alignment.
+
+        Note:
+            When using GPyTorch kernels with n>800, GPyTorch switches from Cholesky
+            decomposition to conjugate gradient (CG) solver, which can cause numerical
+            differences.
         """
         self.n, self.m = X.shape
         self.X, self.y = X.float(), y
@@ -53,9 +58,10 @@ class RKHSSHAP(RKHSSHAPBase):
         mean_train = self._eval_mean(self.X)
         y_centered = self.y - mean_train
 
-        krr_weights: Tensor = torch.linalg.solve(
-            K_train + noise_var * torch.eye(self.n), y_centered
-        )
+        jitter = 1e-6
+        K_reg = K_train + (noise_var + jitter) * torch.eye(self.n)
+
+        krr_weights: Tensor = torch.linalg.solve(K_reg, y_centered)
         self.krr_weights = krr_weights.reshape(-1, 1)
 
         # Predictions include mean function
@@ -77,14 +83,6 @@ class RKHSSHAP(RKHSSHAPBase):
         S_kernel = SubsetKernel(self.kernel, subset_dims=S)
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
         return S_kernel, Sc_kernel
-
-    def _eval_mean(self, X: Tensor) -> Tensor:
-        """Evaluate mean function with proper shape handling."""
-        with torch.no_grad():
-            mean = self.mean_function(X).detach()
-        if mean.dim() == 0:
-            mean = mean.repeat(X.shape[0])
-        return mean
 
     def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.

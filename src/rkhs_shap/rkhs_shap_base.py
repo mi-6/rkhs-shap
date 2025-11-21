@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import Callable
 
 import numpy as np
+import torch
 from scipy.special import binom
 from sklearn.linear_model import Ridge
 from torch import Tensor
@@ -18,6 +20,7 @@ class RKHSSHAPBase(ABC):
 
     m: int
     reference: float
+    mean_function: Callable[[Tensor], Tensor]
 
     @abstractmethod
     def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
@@ -44,6 +47,14 @@ class RKHSSHAPBase(ABC):
             Value function evaluated at X_test, shape (1, n_test)
         """
         ...
+
+    def _eval_mean(self, X: Tensor) -> Tensor:
+        """Evaluate mean function with proper shape handling."""
+        with torch.no_grad():
+            mean = self.mean_function(X).detach()
+        if mean.dim() == 0:
+            mean = mean.repeat(X.shape[0])
+        return mean
 
     def fit(
         self,
