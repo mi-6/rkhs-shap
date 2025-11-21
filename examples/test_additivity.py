@@ -6,7 +6,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from rkhs_shap.exact_gp import ExactGPModel
 from rkhs_shap.rkhs_shap_exact import RKHSSHAP
-from rkhs_shap.utils import to_tensor
+from rkhs_shap.utils import calculate_additivity_mae, to_tensor
 
 
 def load_scaled_dataset(n_train: int, n_val: int = 500):
@@ -72,36 +72,51 @@ def test_sample_size(n_train: int, explain_size: int = 100):
     pred_explain = model.predict_mean_numpy(X_explain)
     baseline = model.predict_mean_numpy(X_train).mean()
 
-    shap_sums = shap_values.sum(axis=1)
-    pred_diffs = pred_explain - baseline
-    additivity_errors = np.abs(shap_sums - pred_diffs)
+    additivity_mae = calculate_additivity_mae(
+        shap_values=shap_values,
+        model_preds=to_tensor(pred_explain),
+        baseline=baseline,
+    )
+
+    # Check internal additivity using RKHS-SHAP's own predictions
+    internal_preds = rkhs_shap.ypred[:explain_size].squeeze()
+    internal_baseline = rkhs_shap.reference
+
+    internal_mae = calculate_additivity_mae(
+        shap_values=shap_values,
+        model_preds=internal_preds,
+        baseline=internal_baseline,
+    )
 
     # Print results
     print("\nResults:")
     print(f"  GP baseline: {baseline:.6f}")
     print(f"  RKHS reference: {rkhs_shap.reference:.6f}")
     print(f"  Baseline difference: {abs(baseline - rkhs_shap.reference):.6f}")
-    print(f"  Additivity MAE: {np.mean(additivity_errors):.6f}")
-    print(f"  Max additivity error: {np.max(additivity_errors):.6f}")
+    print(f"  Additivity MAE (GP): {additivity_mae:.6f}")
+    print(f"  Internal Additivity MAE: {internal_mae:.6f}")
 
-    return np.mean(additivity_errors)
+    return additivity_mae, internal_mae
 
 
 if __name__ == "__main__":
     # Test various sample sizes around the threshold
-    sample_sizes = [100, 500, 799, 800, 801, 802, 1000]
+    sample_sizes = [100, 500, 800, 1000]
 
     results = {}
     for n in sample_sizes:
-        mae = test_sample_size(n)
-        results[n] = mae
+        mae, internal_mae = test_sample_size(n)
+        results[n] = (mae, internal_mae)
 
     # Summary
     print(f"\n{'=' * 60}")
     print("SUMMARY")
     print(f"{'=' * 60}")
-    print("Sample Size | Additivity MAE")
-    print("-" * 40)
-    for n, mae in results.items():
+    print("Sample Size | Additivity MAE (GP) | Internal MAE")
+    print("-" * 60)
+    for n, (mae, internal_mae) in results.items():
         status = "✓" if mae < 0.05 else "✗"
-        print(f"{n:11d} | {mae:.6f} {status}")
+        internal_status = "✓" if internal_mae < 0.001 else "✗"
+        print(
+            f"{n:11d} | {mae:.6f} {status:>12} | {internal_mae:.6f} {internal_status}"
+        )

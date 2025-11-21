@@ -61,18 +61,6 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         self.reference = self.ypred.mean().item()
         self.Z = Z
 
-    def predict(self, X_test: Tensor) -> Tensor:
-        """Predict using the fitted KRR model with Nyström approximation.
-
-        Args:
-            X_test: Test points of shape (n_test, m)
-
-        Returns:
-            Predictions of shape (n_test,)
-        """
-        Z_test = self.nystroem.transform(X_test)
-        return (Z_test @ self.Z.T @ self.krr_weights).squeeze()
-
     def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
 

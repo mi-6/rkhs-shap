@@ -19,6 +19,7 @@ N_COMPONENTS = 50
 
 # Assertion thresholds (more lenient for approximate method with Nyström)
 MAX_ADDITIVITY_MAE = 0.10  # Nyström approximation has lower accuracy
+MAX_INTERNAL_MAE = 0.0001
 MIN_INTERVENTIONAL_CORRELATION = 0.90
 DEFAULT_MIN_OBSERVATIONAL_CORRELATION = 0.75
 
@@ -96,8 +97,18 @@ def run_rkhs_shap_test(
     model_preds = gp.predict(X_explain).mean
     baseline = gp.predict(X_train).mean.mean().item()
 
+    internal_preds = rkhs_shap.ypred[:N_EXPLAIN_SAMPLES].squeeze()
+    internal_baseline = rkhs_shap.reference
+
     additivity_mae_I = calculate_additivity_mae(shap_values_I, model_preds, baseline)
     additivity_mae_O = calculate_additivity_mae(shap_values_O, model_preds, baseline)
+
+    internal_mae_I = calculate_additivity_mae(
+        shap_values_I, internal_preds, internal_baseline
+    )
+    internal_mae_O = calculate_additivity_mae(
+        shap_values_O, internal_preds, internal_baseline
+    )
 
     explainer = shap.KernelExplainer(gp.predict_mean_numpy, X_train.numpy())
     kernel_explanation = explainer(X_explain.numpy())
@@ -117,6 +128,8 @@ def run_rkhs_shap_test(
     print(f"\n{kernel_name} Kernel Test Results (Approximate with Nyström):")
     print(f"RKHS-SHAP Interventional additivity MAE: {additivity_mae_I:.6f}")
     print(f"RKHS-SHAP Observational additivity MAE: {additivity_mae_O:.6f}")
+    print(f"RKHS-SHAP Internal Interventional MAE: {internal_mae_I:.6f}")
+    print(f"RKHS-SHAP Internal Observational MAE: {internal_mae_O:.6f}")
     print(f"KernelSHAP additivity MAE: {kernel_additivity_mae:.6f}")
     print("\nCorrelation with KernelSHAP:")
     print(f"  Interventional: {mean_corr_I:.3f}")
@@ -130,6 +143,13 @@ def run_rkhs_shap_test(
     )
     assert additivity_mae_O < MAX_ADDITIVITY_MAE, (
         f"Observational additivity error too large: {additivity_mae_O}"
+    )
+
+    assert internal_mae_I < MAX_INTERNAL_MAE, (
+        f"Internal interventional additivity error too large: {internal_mae_I}"
+    )
+    assert internal_mae_O < MAX_INTERNAL_MAE, (
+        f"Internal observational additivity error too large: {internal_mae_O}"
     )
 
     assert mean_corr_I > MIN_INTERVENTIONAL_CORRELATION, (

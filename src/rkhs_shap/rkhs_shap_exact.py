@@ -45,23 +45,10 @@ class RKHSSHAP(RKHSSHAPBase):
         krr_weights: Tensor = torch.linalg.solve(
             K_train + noise_var * torch.eye(self.n), self.y
         )
-
         self.krr_weights = krr_weights.reshape(-1, 1)
         self.ypred = K_train @ krr_weights
         self.rmse = torch.sqrt(torch.mean((self.ypred - self.y) ** 2)).item()
         self.reference = self.ypred.mean().item()
-
-    def predict(self, X_test: Tensor) -> Tensor:
-        """Predict using the fitted KRR model.
-
-        Args:
-            X_test: Test points of shape (n_test, m)
-
-        Returns:
-            Predictions of shape (n_test,)
-        """
-        K_test = self.kernel(self.X, X_test).to_dense()
-        return (K_test.T @ self.krr_weights).squeeze()
 
     def _get_subset_kernels(self, z: np.ndarray):
         """Extract coalition and complement kernels from binary coalition vector.
