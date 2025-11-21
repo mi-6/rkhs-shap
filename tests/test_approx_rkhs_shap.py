@@ -78,6 +78,7 @@ def run_rkhs_shap_test(
         noise_var=lambda_krr.item(),
         cme_reg=lambda_cme.item(),
         n_components=N_COMPONENTS,
+        mean_function=gp.mean_module,
     )
 
     X_explain = X_train[:N_EXPLAIN_SAMPLES]

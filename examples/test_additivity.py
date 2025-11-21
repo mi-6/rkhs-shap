@@ -54,6 +54,7 @@ def test_sample_size(n_train: int, explain_size: int = 100):
         kernel=model.covar_module,
         noise_var=noise_var,
         cme_reg=1e-4,
+        mean_function=model.mean_module,
     )
 
     # Explain first 100 points
@@ -101,7 +102,7 @@ def test_sample_size(n_train: int, explain_size: int = 100):
 
 if __name__ == "__main__":
     # Test various sample sizes around the threshold
-    sample_sizes = [100, 500, 800, 1000]
+    sample_sizes = [100, 500, 800, 801, 1000]
 
     results = {}
     for n in sample_sizes:
