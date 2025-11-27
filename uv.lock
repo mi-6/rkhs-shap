@@ -2213,7 +2213,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "gpytorch", specifier = ">=1.9" },
-    { name = "numpy", specifier = ">=2" },
+    { name = "numpy", specifier = ">=1" },
     { name = "scikit-learn", specifier = ">=1" },
     { name = "tqdm", specifier = ">=4" },
 ]
