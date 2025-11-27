@@ -99,7 +99,7 @@ class RKHSSHAP(RKHSSHAPBase):
 
         K_SSp = S_kernel(self.X, X_test).to_dense()
         K_Sc = Sc_kernel(self.X, self.X).to_dense()
-        KME_vec = K_Sc.mean(axis=1, keepdim=True)
+        KME_vec = K_Sc.mean(dim=1, keepdim=True)
 
         ypred_partial = self.krr_weights.T @ (K_SSp * KME_vec) + self._eval_mean(
             X_test
