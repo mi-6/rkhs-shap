@@ -47,7 +47,8 @@ class RKHSSHAP(RKHSSHAPBase):
         y_centered = self.y - mean_train
 
         jitter = 1e-6
-        K_reg = K_train + (noise_var + jitter) * torch.eye(self.n)
+        self.eye_n = torch.eye(self.n)
+        K_reg = K_train + (noise_var + jitter) * self.eye_n
 
         krr_weights: Tensor = torch.linalg.solve(K_reg, y_centered)
         self.krr_weights = krr_weights.reshape(-1, 1)
@@ -56,6 +57,19 @@ class RKHSSHAP(RKHSSHAPBase):
         self.ypred = K_train @ krr_weights + mean_train
         self.rmse = torch.sqrt(torch.mean((self.ypred - self.y) ** 2)).item()
         self.reference = self.ypred.mean().item()
+
+    def _compute_full_prediction(self, X_test: Tensor) -> Tensor:
+        """Compute full prediction for all features active (z.sum() == m).
+
+        Args:
+            X_test: Test points of shape (n_test, m)
+
+        Returns:
+            Prediction minus reference, shape (1, n_test)
+        """
+        K_test = self.kernel(self.X, X_test).to_dense()
+        ypred_test = self.krr_weights.T @ K_test + self._eval_mean(X_test).unsqueeze(0)
+        return ypred_test - self.reference
 
     def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
@@ -70,18 +84,11 @@ class RKHSSHAP(RKHSSHAPBase):
         Returns:
             Value function evaluated at X_test, shape (1, n_test)
         """
-        n_test = X_test.shape[0]
-
         if z.sum() == 0:
             return torch.zeros(1, X_test.shape[0])
 
         if z.sum() == self.m:
-            # If all features are active, return full prediction
-            K_test = self.kernel(self.X, X_test).to_dense()
-            ypred_test = self.krr_weights.T @ K_test + self._eval_mean(
-                X_test
-            ).unsqueeze(0)
-            return ypred_test - self.reference
+            return self._compute_full_prediction(X_test)
 
         # Naming conventions:
         # S ⊆ {1, 2, ..., m} is a subset of all m features (coalition)
@@ -92,9 +99,9 @@ class RKHSSHAP(RKHSSHAPBase):
 
         K_SSp = S_kernel(self.X, X_test).to_dense()
         K_Sc = Sc_kernel(self.X, self.X).to_dense()
-        KME_mat = K_Sc.mean(axis=1, keepdim=True).repeat(1, n_test)
+        KME_vec = K_Sc.mean(axis=1, keepdim=True)
 
-        ypred_partial = self.krr_weights.T @ (K_SSp * KME_mat) + self._eval_mean(
+        ypred_partial = self.krr_weights.T @ (K_SSp * KME_vec) + self._eval_mean(
             X_test
         ).unsqueeze(0)
         return ypred_partial - self.reference
@@ -116,11 +123,7 @@ class RKHSSHAP(RKHSSHAPBase):
             return torch.zeros(1, X_test.shape[0])
 
         if z.sum() == self.m:
-            K_test = self.kernel(self.X, X_test).to_dense()
-            ypred_test = self.krr_weights.T @ K_test + self._eval_mean(
-                X_test
-            ).unsqueeze(0)
-            return ypred_test - self.reference
+            return self._compute_full_prediction(X_test)
 
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
@@ -129,9 +132,7 @@ class RKHSSHAP(RKHSSHAPBase):
         K_SS = S_kernel(self.X, self.X).to_dense()
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
-        Xi_S = torch.linalg.solve(
-            K_SS + self.n * self.cme_reg * torch.eye(self.n), K_Sc
-        ).T
+        Xi_S = torch.linalg.solve(K_SS + self.n * self.cme_reg * self.eye_n, K_Sc).T
 
         ypred_partial = self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) + self._eval_mean(
             X_test
