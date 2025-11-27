@@ -1,7 +1,7 @@
 from itertools import combinations
+from math import comb
 
 import numpy as np
-from scipy.special import binom
 
 
 def generate_full_Z(m: int) -> np.ndarray:
@@ -110,7 +110,7 @@ def _get_weights(s: int, m: int) -> float:
     Returns:
         Unnormalised probability weight
     """
-    return (m - 1) / (binom(m, s) * s * (m - s))
+    return (m - 1) / (comb(m, s) * s * (m - s))
 
 
 def generate_samples_Z(m: int, mcmc_run: int, warm_up_cut: int) -> np.ndarray:

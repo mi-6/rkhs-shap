@@ -2,8 +2,9 @@
 #
 #############
 
+import math
+
 import numpy as np
-from scipy.special import binom
 from sklearn.linear_model import Ridge
 from tqdm import tqdm
 
@@ -123,7 +124,7 @@ class CorrelatedLinearModel(object):
                         1
                         / (
                             (self.m - 1)
-                            / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
+                            / (math.comb(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
                         )
                     )
 
@@ -141,7 +142,7 @@ class CorrelatedLinearModel(object):
                         1
                         / (
                             (self.m - 1)
-                            / (binom(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
+                            / (math.comb(self.m, sum(z)) * sum(z) * (self.m - sum(z)))
                         )
                     )
 

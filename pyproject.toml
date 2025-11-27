@@ -9,7 +9,6 @@ dependencies = [
     "gpytorch>=1.9",
     "numpy>=2",
     "scikit-learn>=1",
-    "scipy>=1",
     "tqdm>=4",
 ]
 

@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import deepcopy
+from math import comb
 
 import numpy as np
 import torch
 from gpytorch.kernels import Kernel
-from scipy.special import binom
 from sklearn.linear_model import Ridge
 from torch import Tensor
 from tqdm import tqdm
@@ -153,7 +153,8 @@ class RKHSSHAPBase(ABC):
                 weights.append(1e5)
             else:
                 weights.append(
-                    (m - 1) / (binom(m, np.sum(row)) * np.sum(row) * (m - np.sum(row)))
+                    (m - 1)
+                    / (comb(m, int(np.sum(row))) * np.sum(row) * (m - np.sum(row)))
                 )
 
             if method == "O":
