@@ -92,7 +92,7 @@ class RKHSSHAPBase(ABC):
         with torch.inference_mode():
             mean = self.mean_function(X).detach()
         if mean.dim() == 0:
-            mean = mean.repeat(X.shape[0])
+            mean = mean.expand(X.shape[0])
         return mean
 
     def _get_subset_kernels(self, z: np.ndarray):
@@ -145,26 +145,26 @@ class RKHSSHAPBase(ABC):
         n_coalitions = Z.shape[0]
         n_test = X_test.shape[0]
         Y_target = np.zeros((n_coalitions, n_test))
-        count = 0
-        weights = []
 
-        for row in tqdm(Z):
-            if np.sum(row) == 0 or np.sum(row) == m:
-                weights.append(1e5)
-            else:
-                weights.append(
-                    (m - 1)
-                    / (comb(m, int(np.sum(row))) * np.sum(row) * (m - np.sum(row)))
-                )
+        coalition_sizes = Z.sum(axis=1)
+        is_empty_or_full = (coalition_sizes == 0) | (coalition_sizes == m)
 
-            if method == "O":
-                Y_target[count, :] = self._value_observation(row, X_test)
-            elif method == "I":
-                Y_target[count, :] = self._value_intervention(row, X_test)
-            else:
-                raise ValueError("Must be either interventional or observational")
+        binomial_coeffs = np.array([comb(m, int(s)) for s in coalition_sizes])
+        shapley_kernel = (m - 1) / (
+            binomial_coeffs * coalition_sizes * (m - coalition_sizes)
+        )
 
-            count += 1
+        weights = np.where(is_empty_or_full, 1e5, shapley_kernel)
+
+        if method == "O":
+            value_fn = self._value_observation
+        elif method == "I":
+            value_fn = self._value_intervention
+        else:
+            raise ValueError("Must be either interventional or observational")
+
+        for idx, row in enumerate(tqdm(Z)):
+            Y_target[idx, :] = value_fn(row, X_test)
 
         clf = Ridge(wls_reg)
         clf.fit(Z, Y_target, sample_weight=weights)
