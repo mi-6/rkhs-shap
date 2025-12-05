@@ -154,7 +154,7 @@ class RKHSSHAPBase(ABC):
             binomial_coeffs * coalition_sizes * (m - coalition_sizes)
         )
 
-        weights = np.where(is_empty_or_full, 1e5, shapley_kernel)
+        weights = np.where(is_empty_or_full, 1e10, shapley_kernel)
 
         if method == "O":
             value_fn = self._value_observation
