@@ -53,7 +53,7 @@ class RKHSSHAPBase(ABC):
                 residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
         """
         self.n, self.m = X.shape
-        self.X, self.y = X.float(), y.float()
+        self.X, self.y = X.double(), y.double()
         self.cme_reg = to_tensor(cme_reg)
         self.mean_function = (
             mean_function if mean_function else lambda x: torch.zeros(x.shape[0])

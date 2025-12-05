@@ -97,10 +97,10 @@ if __name__ == "__main__":
     test_y_array = np.asarray(test_y).reshape(-1, 1)
     test_y = output_scaler.transform(test_y_array).flatten()
 
-    train_x = torch.tensor(X_train, dtype=torch.float32)
-    train_y = torch.tensor(train_y, dtype=torch.float32)
-    test_x = torch.tensor(X_test, dtype=torch.float32)
-    test_y = torch.tensor(test_y, dtype=torch.float32)
+    train_x = torch.tensor(X_train)
+    train_y = torch.tensor(train_y)
+    test_x = torch.tensor(X_test)
+    test_y = torch.tensor(test_y)
 
     print("Testing RBF Kernel:")
     model = ExactGPModel(train_x, train_y)

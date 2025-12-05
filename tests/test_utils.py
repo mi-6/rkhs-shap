@@ -15,14 +15,16 @@ class TestToTensor:
         arr = np.array([1.0, 2.0, 3.0])
         tensor = to_tensor(arr)
         assert isinstance(tensor, torch.Tensor)
-        assert tensor.dtype == torch.float32
-        assert torch.allclose(tensor, torch.tensor([1.0, 2.0, 3.0]))
+        assert tensor.dtype == torch.float64
+        assert torch.allclose(
+            tensor, torch.tensor([1.0, 2.0, 3.0], dtype=torch.float64)
+        )
 
     def test_from_tensor(self):
         original = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float64)
         tensor = to_tensor(original)
-        assert tensor.dtype == torch.float32
-        assert torch.allclose(tensor, original.float())
+        assert tensor.dtype == torch.float64
+        assert torch.allclose(tensor, original.double())
 
     def test_from_scalar(self):
         tensor = to_tensor(5.0)
