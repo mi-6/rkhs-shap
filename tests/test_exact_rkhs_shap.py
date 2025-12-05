@@ -95,7 +95,7 @@ def run_rkhs_shap_test(
     gp, X_train, y_train = trained_model
     kernel_name = gp.covar_module.__class__.__name__
 
-    lambda_krr = gp.likelihood.noise.detach().cpu().float()
+    lambda_krr = gp.likelihood.noise.detach().cpu()
     lambda_cme = to_tensor(CME_REGULARIZATION)
 
     rkhs_shap = RKHSSHAP(
@@ -218,6 +218,74 @@ def test_exact_rkhs_shap_diabetes_underfit(trained_model_underfit):
     converged, which may have suboptimal hyperparameters and poor predictions.
     """
     run_rkhs_shap_test(trained_model_underfit, min_corr_O=0.83)
+
+
+def test_exact_rkhs_shap_mc_sampling():
+    """Test exact RKHS-SHAP with MC sampling on higher-dimensional synthetic data.
+
+    This test verifies:
+    1. RKHS-SHAP works with Monte Carlo coalition sampling (sample_method="MC")
+    2. MC sampling produces reasonable results on problems where full enumeration is infeasible
+    3. Additivity property is approximately satisfied with MC sampling
+    """
+    np.random.seed(42)
+    torch.manual_seed(42)
+
+    n_train = 100
+    n_features = 15
+    n_explain = 5
+
+    X_train = torch.randn(n_train, n_features, dtype=torch.float64)
+    true_weights = torch.randn(n_features, dtype=torch.float64) * 0.5
+    y_train = (X_train @ true_weights + 0.1 * torch.randn(n_train, dtype=torch.float64))
+
+    kernel = gpytorch.kernels.RBFKernel(ard_num_dims=n_features)
+    kernel.lengthscale = torch.ones(1, n_features) * 2.0
+
+    trained_model = train_gp_model(X_train, y_train, covar_module=kernel, training_iter=50)
+    gp, X_train, y_train = trained_model
+
+    lambda_krr = gp.likelihood.noise.detach().cpu()
+    lambda_cme = to_tensor(CME_REGULARIZATION)
+
+    rkhs_shap = RKHSSHAP(
+        X=X_train,
+        y=y_train,
+        kernel=gp.covar_module,
+        noise_var=lambda_krr.item(),
+        cme_reg=lambda_cme.item(),
+        mean_function=gp.mean_module,
+    )
+
+    X_explain = X_train[:n_explain]
+
+    shap_values_I = rkhs_shap.fit(
+        X_test=X_explain,
+        method="I",
+        sample_method="MC",
+        num_samples=500,
+    )
+
+    model_preds = gp.predict(X_explain).mean
+    baseline = gp.predict(X_train).mean.mean().item()
+
+    additivity_mae_I = calculate_additivity_mae(shap_values_I, model_preds, baseline)
+    pred_range = (model_preds.max() - model_preds.min()).item()
+    normalized_mae = additivity_mae_I / pred_range
+
+    print(f"\nMC Sampling Test Results (m={n_features}):")
+    print(f"Number of samples: 500 (out of 2^{n_features} = {2**n_features} possible)")
+    print(f"RKHS-SHAP Interventional additivity MAE: {normalized_mae:.6f}")
+    print(f"SHAP values shape: {shap_values_I.shape}")
+
+    assert shap_values_I.shape == (n_explain, n_features)
+    assert normalized_mae < 1e-4, (
+        f"MC sampling additivity error too large: {normalized_mae:.6f}"
+    )
+
+    print("\n" + "=" * 60)
+    print("MC Sampling test passed!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
