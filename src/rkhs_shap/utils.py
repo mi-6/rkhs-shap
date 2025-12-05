@@ -9,7 +9,7 @@ def freeze_parameters(module: Module) -> None:
         param.requires_grad_(False)
 
 
-def to_tensor(value, dtype: torch.dtype = torch.float32) -> torch.Tensor:
+def to_tensor(value, dtype: torch.dtype = torch.float64) -> torch.Tensor:
     """Convert value to tensor, handling both scalar and tensor inputs safely.
 
     Args:

@@ -1,4 +1,3 @@
-import torch
 from gpytorch.kernels import Kernel
 from sklearn.cluster import KMeans
 from torch import Tensor
@@ -33,7 +32,7 @@ class Nystroem:
         X_tensor = to_tensor(X)
         km = KMeans(n_clusters=self.n_components, random_state=0)
         km.fit(X_tensor.cpu().numpy())
-        self.landmarks = torch.tensor(km.cluster_centers_, dtype=torch.float32)
+        self.landmarks = to_tensor(km.cluster_centers_)
 
     def transform(self, X: Tensor) -> Tensor:
         """Transform data using Nyström approximation.

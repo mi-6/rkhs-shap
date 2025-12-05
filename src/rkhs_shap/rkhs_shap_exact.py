@@ -46,8 +46,8 @@ class RKHSSHAP(RKHSSHAPBase):
         mean_train = self._eval_mean(self.X)
         y_centered = self.y - mean_train
 
-        jitter = 1e-6
-        self.eye_n = torch.eye(self.n)
+        jitter = 1e-8
+        self.eye_n = torch.eye(self.n, dtype=self.X.dtype)
         K_reg = K_train + (noise_var + jitter) * self.eye_n
 
         krr_weights: Tensor = torch.linalg.solve(K_reg, y_centered)
@@ -132,7 +132,10 @@ class RKHSSHAP(RKHSSHAPBase):
         K_SS = S_kernel(self.X, self.X).to_dense()
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
-        Xi_S = torch.linalg.solve(K_SS + self.n * self.cme_reg * self.eye_n, K_Sc).T
+        jitter = 1e-8
+        Xi_S = torch.linalg.solve(
+            K_SS + (self.n * self.cme_reg + jitter) * self.eye_n, K_Sc
+        ).T
 
         ypred_partial = self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) + self._eval_mean(
             X_test

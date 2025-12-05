@@ -53,7 +53,7 @@ class RKHSSHAPBase(ABC):
                 residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
         """
         self.n, self.m = X.shape
-        self.X, self.y = X.float(), y.float()
+        self.X, self.y = X.double(), y.double()
         self.cme_reg = to_tensor(cme_reg)
         self.mean_function = (
             mean_function if mean_function else lambda x: torch.zeros(x.shape[0])
@@ -116,7 +116,7 @@ class RKHSSHAPBase(ABC):
         method: str,
         sample_method: str,
         num_samples: int = 100,
-        wls_reg: float = 1e-10,
+        wls_reg: float = 0.01,
     ) -> np.ndarray:
         """Compute RKHS-SHAP values for test points.
 
@@ -154,7 +154,7 @@ class RKHSSHAPBase(ABC):
             binomial_coeffs * coalition_sizes * (m - coalition_sizes)
         )
 
-        weights = np.where(is_empty_or_full, 1e5, shapley_kernel)
+        weights = np.where(is_empty_or_full, 1e10, shapley_kernel)
 
         if method == "O":
             value_fn = self._value_observation

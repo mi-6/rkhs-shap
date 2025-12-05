@@ -53,7 +53,9 @@ def test_subset_kernel_deep_copy():
     # SubsetKernel should not be affected
     expected_lengthscales = to_tensor([1.0, 3.0, 5.0])
     actual_lengthscales = subset_kernel.base_kernel.lengthscale.squeeze()
-    assert torch.allclose(actual_lengthscales, expected_lengthscales)
+    assert torch.allclose(
+        actual_lengthscales, expected_lengthscales.to(actual_lengthscales.dtype)
+    )
 
 
 def test_subset_kernel_different_input_shapes():
