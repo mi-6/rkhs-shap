@@ -116,7 +116,7 @@ class RKHSSHAPBase(ABC):
         method: str,
         sample_method: str,
         num_samples: int = 100,
-        wls_reg: float = 1e-10,
+        wls_reg: float = 0.01,
     ) -> np.ndarray:
         """Compute RKHS-SHAP values for test points.
 
