@@ -237,12 +237,14 @@ def test_exact_rkhs_shap_mc_sampling():
 
     X_train = torch.randn(n_train, n_features, dtype=torch.float64)
     true_weights = torch.randn(n_features, dtype=torch.float64) * 0.5
-    y_train = (X_train @ true_weights + 0.1 * torch.randn(n_train, dtype=torch.float64))
+    y_train = X_train @ true_weights + 0.1 * torch.randn(n_train, dtype=torch.float64)
 
     kernel = gpytorch.kernels.RBFKernel(ard_num_dims=n_features)
     kernel.lengthscale = torch.ones(1, n_features) * 2.0
 
-    trained_model = train_gp_model(X_train, y_train, covar_module=kernel, training_iter=50)
+    trained_model = train_gp_model(
+        X_train, y_train, covar_module=kernel, training_iter=50
+    )
     gp, X_train, y_train = trained_model
 
     lambda_krr = gp.likelihood.noise.detach().cpu()

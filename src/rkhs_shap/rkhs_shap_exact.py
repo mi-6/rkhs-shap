@@ -29,7 +29,8 @@ class RKHSSHAP(RKHSSHAPBase):
             noise_var: KRR regularization parameter. Corresponds to the noise variance
                 in Gaussian Process formulation. If you've fit a GP model, set this to
                 model.likelihood.noise_covar.noise for equivalent predictions.
-            cme_reg: Regularization for conditional/marginal mean embeddings
+            cme_reg: Regularization for conditional/marginal mean embeddings.
+                Only used in observational value function.
             mean_function: Optional mean function m(x). If provided, KRR will fit
                 residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
                 Pass model.mean_module from a fitted GP to ensure prediction alignment.
