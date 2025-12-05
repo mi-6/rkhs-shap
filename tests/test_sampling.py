@@ -6,6 +6,7 @@ from rkhs_shap.sampling import (
     generate_full_Z,
     generate_samples_Z,
     large_scale_sample_alternative,
+    large_scale_sample_uniform,
     subset_full_Z,
 )
 
@@ -86,6 +87,20 @@ def test_generate_samples_Z_warmup():
 
     expected_samples = mcmc_run - warm_up_cut + 4
     assert Z.shape[0] == expected_samples
+
+
+@pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100), (8, 200)])
+def test_large_scale_sample_uniform(m, n_samples):
+    Z = large_scale_sample_uniform(m, n_samples)
+
+    assert Z.shape == (n_samples + 2, m)
+    assert Z.dtype == bool
+    assert np.all(~Z[-2])
+    assert np.all(Z[-1])
+
+    coalition_sizes = Z[:-2].sum(axis=1)
+    assert np.all(coalition_sizes > 0)
+    assert np.all(coalition_sizes < m)
 
 
 if __name__ == "__main__":

@@ -150,11 +150,41 @@ class RKHSSHAPBase(ABC):
         is_empty_or_full = (coalition_sizes == 0) | (coalition_sizes == m)
 
         binomial_coeffs = np.array([comb(m, int(s)) for s in coalition_sizes])
-        shapley_kernel = (m - 1) / (
-            binomial_coeffs * coalition_sizes * (m - coalition_sizes)
+
+        # Compute Shapley kernel weights only for non-trivial coalitions
+        shapley_kernel = np.zeros_like(coalition_sizes, dtype=float)
+        non_trivial = ~is_empty_or_full
+        shapley_kernel[non_trivial] = (m - 1) / (
+            binomial_coeffs[non_trivial]
+            * coalition_sizes[non_trivial]
+            * (m - coalition_sizes[non_trivial])
         )
 
-        weights = np.where(is_empty_or_full, 1e10, shapley_kernel)
+        if sample_method == "MC":
+            # Correct for importance sampling bias in MC sampling
+            # MC sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then samples uniformly within size
+            # So P(coalition of size s) = P(size s) / C(m,s)
+            # For unbiased estimation: weight = shapley_kernel / sampling_probability
+
+            prob_per_size = np.array([(m - 1) / (s * (m - s)) for s in range(1, m)])
+            prob_per_size /= prob_per_size.sum()
+
+            # Map coalition sizes to their normalized probabilities
+            size_to_prob = {s: prob_per_size[s - 1] for s in range(1, m)}
+
+            # Importance sampling correction: multiply by C(m,s) / P(size s)
+            sampling_correction = np.array(
+                [
+                    binomial_coeffs[i] / size_to_prob[int(s)]
+                    if 0 < s < m and int(s) in size_to_prob
+                    else 1.0
+                    for i, s in enumerate(coalition_sizes)
+                ]
+            )
+
+        else:
+            sampling_correction = 1.0
+        weights = np.where(is_empty_or_full, 1e10, shapley_kernel * sampling_correction)
 
         if method == "O":
             value_fn = self._value_observation

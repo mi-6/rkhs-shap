@@ -95,6 +95,46 @@ def large_scale_sample_alternative(m: int, n_samples: int) -> np.ndarray:
     return samples_container
 
 
+def large_scale_sample_uniform(m: int, n_samples: int) -> np.ndarray:
+    """Sample coalitions uniformly (i.i.d.) from all non-trivial coalitions.
+
+    Each coalition has equal probability, regardless of size. This is the simplest
+    form of Monte Carlo sampling. Use with full Shapley kernel weights in regression
+    for unbiased estimation.
+
+    This approach is more transparent than size-stratified sampling (used in SHAP's
+    KernelExplainer) but may have higher variance since it doesn't concentrate
+    samples on subset sizes with higher Shapley kernel weights.
+
+    Args:
+        m: number of features
+        n_samples: number of samples you want
+
+    Returns:
+        Z: The matrix of boolean values, shape (n_samples + 2, m)
+           Last two rows are empty and full coalitions
+    """
+    samples_container = []
+
+    for _ in range(n_samples):
+        coalition = np.random.rand(m) < 0.5
+
+        # Reject empty and full coalitions (re-sample if needed)
+        while coalition.sum() == 0 or coalition.sum() == m:
+            coalition = np.random.rand(m) < 0.5
+
+        samples_container.append(coalition)
+
+    samples_container = np.array(samples_container, dtype=np.bool_)
+
+    # Always include empty and full coalitions
+    empty = np.zeros(m, dtype=bool)
+    full = np.ones(m, dtype=bool)
+    samples_container = np.vstack([samples_container, empty, full])
+
+    return samples_container
+
+
 #################
 # MCMC Sampling #
 #################
