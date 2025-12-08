@@ -1,107 +1,188 @@
 from itertools import combinations
+from math import comb
 
 import numpy as np
 
 
 def sample_coalitions_full(m: int) -> np.ndarray:
-    """Generate the 2^m possible ordering of the binary matrix
+    """Generate all 2^m coalitions exhaustively.
 
     Args:
         m: Number of features
 
     Returns:
-        ls of binary orderings
+        Boolean array of shape (2^m, m) with all possible coalitions
     """
+    Z = np.zeros((2**m, m), dtype=bool)
 
-    Z = np.zeros((2**m, m))
-    Z[-1, :] = True  # Make sure the last row is all ones - part of the hard constraint
-
-    elements = [i for i in range(m)]
     count = 1
     for s in range(1, m):
-        perm_s = list(combinations(elements, s))
-        for i in list(perm_s):
-            Z[count, i] = True
+        for combo in combinations(range(m), s):
+            Z[count, combo] = True
             count += 1
 
-    return Z.astype(np.bool_)
+    Z[-1, :] = True
+    return Z
 
 
 def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
-    """Sample the permutation according to the kernel weight
+    """Sample coalitions according to Shapley kernel weights.
 
-    We first sample the size of the permutation = number of ones in a permutation, and then we randomly select
-    1 particular permutation there since their distribution is uniform conditioned on the size of the permutation.
+    First samples coalition sizes proportional to their Shapley kernel weights,
+    then uniformly samples a specific coalition of that size.
 
     Args:
-        m: number of features
-        n_samples: number of samples you want
+        m: Number of features
+        n_samples: Number of samples
 
     Returns:
-        Z: The matrix of boolean values
+        Boolean array of shape (n_samples + 2, m) with sampled coalitions.
+        Last two rows are empty and full coalitions.
     """
+    prob_vec = np.array([_shapley_kernel_weight(m, s) for s in range(1, m)])
+    prob_vec /= prob_vec.sum()
 
-    def prob_per_size(m: int, s: int) -> float:
-        return (m - 1) / (s * (m - s))
+    sizes = np.random.choice(range(1, m), p=prob_vec, size=n_samples, replace=True)
+
+    Z = np.zeros((n_samples + 2, m), dtype=bool)
+    for i, size in enumerate(sizes):
+        Z[i, np.random.choice(m, size=size, replace=False)] = True
+
+    Z[-2, :] = False
+    Z[-1, :] = True
+
+    return Z
+
+
+def _shapley_kernel_weight(m: int, s: int) -> float:
+    """Compute Shapley kernel weight for coalition size s.
+
+    This is the weight used in the weighted least squares formulation
+    of Shapley value estimation.
+    """
+    return (m - 1) / (s * (m - s))
+
+
+def _enumerate_coalitions_of_size(m: int, size: int) -> np.ndarray:
+    """Generate all coalitions of a specific size."""
+
+    n_combs = comb(m, size)
+    coalitions = np.zeros((n_combs, m), dtype=bool)
+
+    for i, combo in enumerate(combinations(range(m), size)):
+        coalitions[i, combo] = True
+
+    return coalitions
+
+
+def sample_coalitions_hybrid(m: int, n_samples: int) -> np.ndarray:
+    """Hybrid exhaustive/random sampling following SHAP's KernelExplainer strategy.
+
+    Exhaustively enumerates coalition sizes when the sample budget allows, then
+    switches to random sampling for remaining sizes. Processes sizes from extremes
+    (1, m-1) inward (2, m-2, etc.) since these have highest Shapley kernel weights.
+
+    Args:
+        m: Number of features
+        n_samples: Requested number of samples
+
+    Returns:
+        Boolean array of shape (n_total, m) where n_total >= min(2^m, n_samples + 2).
+        When exhaustive enumeration is possible, returns all 2^m coalitions.
+        Last two rows are always empty and full coalitions.
+    """
+    from math import comb
 
     samples_container = []
+    num_samples_left = n_samples
 
-    prob_vec_per_size = np.array([prob_per_size(m, s) for s in range(1, m)])
-    prob_vec_per_size /= prob_vec_per_size.sum()
-    size_ls = np.random.choice(
-        range(1, m), p=prob_vec_per_size, size=n_samples + 2, replace=True
-    )
+    weight_vec = np.array([_shapley_kernel_weight(m, s) for s in range(1, m)])
+    remaining_weight_vec = weight_vec.copy()
 
-    for size in size_ls:
-        all_ones = np.zeros(m)
-        all_ones[:size] = 1
-        shuffled_ind = np.random.choice(range(m), size=m, replace=False)
-        new_sample = all_ones[shuffled_ind]
-        samples_container.append(new_sample)
+    num_subset_sizes = int(np.ceil((m - 1) / 2.0))
 
-    samples_container = np.array(samples_container).astype(np.bool_)
+    for i in range(num_subset_sizes):
+        size_small = i + 1
+        size_large = m - 1 - i
 
-    samples_container[-2, :] = False
-    samples_container[-1, :] = True
+        num_combs_small = comb(m, size_small)
+        num_combs_large = comb(m, size_large)
 
-    return samples_container
+        remaining_weight_sum = remaining_weight_vec.sum()
+        if remaining_weight_sum == 0:
+            break
+
+        weight_small = remaining_weight_vec[size_small - 1]
+        weight_large = remaining_weight_vec[size_large - 1]
+
+        samples_allocated_small = num_samples_left * weight_small / remaining_weight_sum
+        samples_allocated_large = num_samples_left * weight_large / remaining_weight_sum
+
+        if samples_allocated_small >= num_combs_small - 1e-8:
+            coalitions = _enumerate_coalitions_of_size(m, size_small)
+            samples_container.append(coalitions)
+            num_samples_left -= num_combs_small
+            remaining_weight_vec[size_small - 1] = 0
+
+        if (
+            size_small != size_large
+            and samples_allocated_large >= num_combs_large - 1e-8
+        ):
+            coalitions = _enumerate_coalitions_of_size(m, size_large)
+            samples_container.append(coalitions)
+            num_samples_left -= num_combs_large
+            remaining_weight_vec[size_large - 1] = 0
+
+    if num_samples_left > 0 and remaining_weight_vec.sum() > 0:
+        remaining_weight_vec /= remaining_weight_vec.sum()
+
+        sizes = np.random.choice(
+            range(1, m), p=remaining_weight_vec, size=num_samples_left
+        )
+        random_samples = np.zeros((num_samples_left, m), dtype=bool)
+        for i, size in enumerate(sizes):
+            random_samples[i, np.random.choice(m, size=size, replace=False)] = True
+
+        samples_container.append(random_samples)
+
+    if samples_container:
+        Z = np.vstack(samples_container)
+    else:
+        Z = np.empty((0, m), dtype=bool)
+
+    empty = np.zeros((1, m), dtype=bool)
+    full = np.ones((1, m), dtype=bool)
+    Z = np.vstack([Z, empty, full])
+
+    return Z
 
 
 def sample_coalitions_uniform(m: int, n_samples: int) -> np.ndarray:
-    """Sample coalitions uniformly (i.i.d.) from all non-trivial coalitions.
+    """Sample coalitions uniformly from all non-trivial coalitions.
 
-    Each coalition has equal probability, regardless of size. This is the simplest
-    form of Monte Carlo sampling. Use with full Shapley kernel weights in regression
-    for unbiased estimation.
+    Each coalition has equal probability, regardless of size. Use with full
+    Shapley kernel weights in regression for unbiased estimation.
 
-    This approach is more transparent than size-stratified sampling (used in SHAP's
-    KernelExplainer) but may have higher variance since it doesn't concentrate
-    samples on subset sizes with higher Shapley kernel weights.
+    More transparent than weighted sampling but may have higher variance since
+    it doesn't concentrate samples on high-weight coalition sizes.
 
     Args:
-        m: number of features
-        n_samples: number of samples you want
+        m: Number of features
+        n_samples: Number of samples
 
     Returns:
-        Z: The matrix of boolean values, shape (n_samples + 2, m)
-           Last two rows are empty and full coalitions
+        Boolean array of shape (n_samples + 2, m) with sampled coalitions.
+        Last two rows are empty and full coalitions.
     """
-    samples_container = []
+    Z = np.zeros((n_samples + 2, m), dtype=bool)
 
-    for _ in range(n_samples):
+    for i in range(n_samples):
         coalition = np.random.rand(m) < 0.5
-
-        # Reject empty and full coalitions (re-sample if needed)
         while coalition.sum() == 0 or coalition.sum() == m:
             coalition = np.random.rand(m) < 0.5
+        Z[i] = coalition
 
-        samples_container.append(coalition)
+    Z[-2, :] = False
+    Z[-1, :] = True
 
-    samples_container = np.array(samples_container, dtype=np.bool_)
-
-    # Always include empty and full coalitions
-    empty = np.zeros(m, dtype=bool)
-    full = np.ones(m, dtype=bool)
-    samples_container = np.vstack([samples_container, empty, full])
-
-    return samples_container
+    return Z
