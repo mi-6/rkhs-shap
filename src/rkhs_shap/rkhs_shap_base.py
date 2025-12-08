@@ -13,7 +13,6 @@ from tqdm import tqdm
 from rkhs_shap.sampling import (
     generate_full_Z,
     large_scale_sample_alternative,
-    subset_full_Z,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters, to_tensor
@@ -116,7 +115,7 @@ class RKHSSHAPBase(ABC):
         method: str,
         sample_method: str,
         num_samples: int = 100,
-        wls_reg: float = 0.01,
+        wls_reg: float = 0.01,  # TODO: consider decreasing the default
     ) -> np.ndarray:
         """Compute RKHS-SHAP values for test points.
 
@@ -125,7 +124,6 @@ class RKHSSHAPBase(ABC):
             method: "O" (Observational) or "I" (Interventional) Shapley values
             sample_method: Sampling strategy for coalitions:
                 - "MC": Monte Carlo sampling weighted by Shapley kernel
-                - "MC2": Sample from full coalition space
                 - "full" or None: Enumerate all 2^m coalitions
             num_samples: Number of coalition samples (if using MC sampling)
             wls_reg: Regularization for weighted least squares fitting
@@ -136,9 +134,6 @@ class RKHSSHAPBase(ABC):
         m = self.m
         if sample_method == "MC":
             Z = large_scale_sample_alternative(m, num_samples)
-        elif sample_method == "MC2":
-            Z = generate_full_Z(m)
-            Z = subset_full_Z(Z, samples=num_samples)
         else:
             Z = generate_full_Z(m)
 

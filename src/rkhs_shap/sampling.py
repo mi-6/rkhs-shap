@@ -1,5 +1,4 @@
 from itertools import combinations
-from math import comb
 
 import numpy as np
 
@@ -26,33 +25,6 @@ def generate_full_Z(m: int) -> np.ndarray:
             count += 1
 
     return Z.astype(np.bool_)
-
-
-def subset_full_Z(Z: np.ndarray, samples: int = 1000) -> np.ndarray:
-    """Sampling from the full permutation based on the shapley kernel weight
-
-    *note: if M is large this is not very feasible, especially if one wants to deal with Data Shapley
-
-    Args:
-        Z: The array of permutations
-        samples: Number of samples to draw. Defaults to 1000.
-
-    Returns:
-        Z_subset: The subsetted Z matrix according to the kernel shap weight
-    """
-
-    # Set probability weight to sample according to the kernelshap weight - however the all ones and all zeros are ignored
-    prob_vec = [_get_weights(row.sum(), len(row)) for row in Z[1:-1,]]
-
-    index = np.random.choice(
-        2 ** Z.shape[1] - 2,
-        replace=True,
-        p=prob_vec / np.array(prob_vec).sum(),
-        size=samples,
-    )
-    index = np.append(index, [0, -1])
-
-    return Z[index]
 
 
 def large_scale_sample_alternative(m: int, n_samples: int) -> np.ndarray:
@@ -133,16 +105,3 @@ def large_scale_sample_uniform(m: int, n_samples: int) -> np.ndarray:
     samples_container = np.vstack([samples_container, empty, full])
 
     return samples_container
-
-
-def _get_weights(s: int, m: int) -> float:
-    """The unnormalised probability weight to sample a particular permutation
-
-    Args:
-        s: size
-        m: number of active features
-
-    Returns:
-        Unnormalised probability weight
-    """
-    return (m - 1) / (comb(m, s) * s * (m - s))
