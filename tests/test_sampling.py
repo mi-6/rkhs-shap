@@ -4,7 +4,6 @@ import pytest
 from rkhs_shap.sampling import (
     _get_weights,
     generate_full_Z,
-    generate_samples_Z,
     large_scale_sample_alternative,
     large_scale_sample_uniform,
     subset_full_Z,
@@ -62,31 +61,6 @@ def test_get_weights_boundary():
 
     assert weight_low > 0
     assert weight_high > 0
-
-
-@pytest.mark.parametrize("m,mcmc_run,warm_up_cut", [(3, 50, 10), (5, 100, 20)])
-def test_generate_samples_Z(m, mcmc_run, warm_up_cut):
-    np.random.seed(42)
-    Z = generate_samples_Z(m, mcmc_run, warm_up_cut)
-
-    assert Z.shape[1] == m
-    assert Z.shape[0] == mcmc_run - warm_up_cut + 4
-    assert Z.dtype == bool
-
-    assert np.all(Z[-2])
-    assert np.all(~Z[-1])
-
-
-def test_generate_samples_Z_warmup():
-    np.random.seed(42)
-    m = 4
-    mcmc_run = 100
-    warm_up_cut = 30
-
-    Z = generate_samples_Z(m, mcmc_run, warm_up_cut)
-
-    expected_samples = mcmc_run - warm_up_cut + 4
-    assert Z.shape[0] == expected_samples
 
 
 @pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100), (8, 200)])

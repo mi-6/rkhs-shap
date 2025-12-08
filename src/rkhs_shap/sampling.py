@@ -135,11 +135,6 @@ def large_scale_sample_uniform(m: int, n_samples: int) -> np.ndarray:
     return samples_container
 
 
-#################
-# MCMC Sampling #
-#################
-
-
 def _get_weights(s: int, m: int) -> float:
     """The unnormalised probability weight to sample a particular permutation
 
@@ -151,56 +146,3 @@ def _get_weights(s: int, m: int) -> float:
         Unnormalised probability weight
     """
     return (m - 1) / (comb(m, s) * s * (m - s))
-
-
-def generate_samples_Z(m: int, mcmc_run: int, warm_up_cut: int) -> np.ndarray:
-    """Generate Samples of zs' for the KS4K
-
-    Args:
-        m: number of features
-        mcmc_run: number of MCMC runs
-        warm_up_cut: number of warmup to discard (initial runs not converging to stationary dist)
-
-    Returns:
-        Z: samples of zs' for KS4K returned as the Z matrix in KernelSHAP
-    """
-    z_init = np.random.choice([1, -1], size=m)
-    z_vec: list[np.ndarray] = []
-    z_vec.append(z_init)
-    propose = z_init
-
-    count = 0
-    while count <= mcmc_run:
-        current = z_vec[count]
-        index = np.random.randint(m)
-        propose = current.copy()
-        propose[index] = -propose[index]
-        propose_s = (propose == 1).sum()
-        current_s = (current == 1).sum()
-
-        # These two cases should have probability 0 reaching there
-        if propose_s == m or propose_s == 0:
-            continue
-        else:
-            # the alpha score in MCMC
-            a_t = min(
-                1.0,
-                _get_weights(int(propose_s), int(m))
-                / _get_weights(int(current_s), int(m)),
-            )
-
-            if np.random.uniform() <= a_t:
-                # Append the proposed one
-                z_vec.append(propose)
-                count += 1
-            else:
-                # Append the current one
-                z_vec.append(current)
-                count += 1
-
-    z_vec = z_vec[warm_up_cut:]
-    z_vec.append(np.ones_like(propose))
-    z_vec.append(-np.ones_like(propose))
-    z_arr = (np.array(z_vec) + 1) / 2
-
-    return z_arr.astype(np.bool_)
