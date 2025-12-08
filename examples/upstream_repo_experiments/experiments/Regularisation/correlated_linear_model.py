@@ -8,11 +8,7 @@ import numpy as np
 from sklearn.linear_model import Ridge
 from tqdm import tqdm
 
-from rkhs_shap.sampling import (
-    generate_full_Z,
-    large_scale_sample_alternative,
-    subset_full_Z,
-)
+from rkhs_shap.sampling import sample_coalitions_full, sample_coalitions_weighted
 
 
 class CorrelatedLinearModel(object):
@@ -102,12 +98,9 @@ class CorrelatedLinearModel(object):
         n = X.shape[0]
 
         if sample_method == "MC":
-            Z = large_scale_sample_alternative(self.m, num_samples)
-        elif sample_method == "MC2":
-            Z = generate_full_Z(self.m)
-            Z = subset_full_Z(Z, samples=num_samples)
+            Z = sample_coalitions_weighted(self.m, num_samples)
         elif sample_method == "Full":
-            Z = generate_full_Z(self.m)
+            Z = sample_coalitions_full(self.m)
 
         epoch = Z.shape[0]
         Y_target = np.zeros((epoch, n))

@@ -3,7 +3,7 @@ from itertools import combinations
 import numpy as np
 
 
-def generate_full_Z(m: int) -> np.ndarray:
+def sample_coalitions_full(m: int) -> np.ndarray:
     """Generate the 2^m possible ordering of the binary matrix
 
     Args:
@@ -27,7 +27,7 @@ def generate_full_Z(m: int) -> np.ndarray:
     return Z.astype(np.bool_)
 
 
-def large_scale_sample_alternative(m: int, n_samples: int) -> np.ndarray:
+def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
     """Sample the permutation according to the kernel weight
 
     We first sample the size of the permutation = number of ones in a permutation, and then we randomly select
@@ -67,7 +67,7 @@ def large_scale_sample_alternative(m: int, n_samples: int) -> np.ndarray:
     return samples_container
 
 
-def large_scale_sample_uniform(m: int, n_samples: int) -> np.ndarray:
+def sample_coalitions_uniform(m: int, n_samples: int) -> np.ndarray:
     """Sample coalitions uniformly (i.i.d.) from all non-trivial coalitions.
 
     Each coalition has equal probability, regardless of size. This is the simplest

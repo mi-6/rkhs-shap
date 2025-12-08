@@ -2,15 +2,15 @@ import numpy as np
 import pytest
 
 from rkhs_shap.sampling import (
-    generate_full_Z,
-    large_scale_sample_alternative,
-    large_scale_sample_uniform,
+    sample_coalitions_full,
+    sample_coalitions_uniform,
+    sample_coalitions_weighted,
 )
 
 
 @pytest.mark.parametrize("m", [2, 3, 4])
-def test_generate_full_Z(m):
-    Z = generate_full_Z(m)
+def test_sample_coalitions_full(m):
+    Z = sample_coalitions_full(m)
 
     assert Z.shape == (2**m, m)
     assert Z.dtype == bool
@@ -22,8 +22,8 @@ def test_generate_full_Z(m):
 
 
 @pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100), (8, 200)])
-def test_large_scale_sample_alternative(m, n_samples):
-    Z = large_scale_sample_alternative(m, n_samples)
+def test_sample_coalitions_weighted(m, n_samples):
+    Z = sample_coalitions_weighted(m, n_samples)
 
     assert Z.shape == (n_samples + 2, m)
     assert Z.dtype == bool
@@ -35,8 +35,8 @@ def test_large_scale_sample_alternative(m, n_samples):
 
 
 @pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100), (8, 200)])
-def test_large_scale_sample_uniform(m, n_samples):
-    Z = large_scale_sample_uniform(m, n_samples)
+def test_sample_coalitions_uniform(m, n_samples):
+    Z = sample_coalitions_uniform(m, n_samples)
 
     assert Z.shape == (n_samples + 2, m)
     assert Z.dtype == bool

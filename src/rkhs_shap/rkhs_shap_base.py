@@ -11,8 +11,8 @@ from torch import Tensor
 from tqdm import tqdm
 
 from rkhs_shap.sampling import (
-    generate_full_Z,
-    large_scale_sample_alternative,
+    sample_coalitions_full,
+    sample_coalitions_weighted,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters, to_tensor
@@ -133,9 +133,9 @@ class RKHSSHAPBase(ABC):
         """
         m = self.m
         if sample_method == "MC":
-            Z = large_scale_sample_alternative(m, num_samples)
+            Z = sample_coalitions_weighted(m, num_samples)
         else:
-            Z = generate_full_Z(m)
+            Z = sample_coalitions_full(m)
 
         n_coalitions = Z.shape[0]
         n_test = X_test.shape[0]

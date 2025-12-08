@@ -8,8 +8,8 @@ from tqdm import tqdm
 
 from rkhs_shap.kernel_approx import Nystroem
 from rkhs_shap.sampling import (
-    generate_full_Z,
-    large_scale_sample_alternative,
+    sample_coalitions_full,
+    sample_coalitions_weighted,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import to_tensor
@@ -171,9 +171,9 @@ class ShapleyRegulariser(object):
 
         m_exclude_i = self.m - len(features_index)
         if sample_method == "MC":
-            Z_exclude_i = large_scale_sample_alternative(m_exclude_i, num_samples)
+            Z_exclude_i = sample_coalitions_weighted(m_exclude_i, num_samples)
         else:
-            Z_exclude_i = generate_full_Z(m_exclude_i)
+            Z_exclude_i = sample_coalitions_full(m_exclude_i)
         A = np.zeros((self.n, self.n))
 
         for row in tqdm(Z_exclude_i):
