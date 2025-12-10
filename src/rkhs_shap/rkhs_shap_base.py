@@ -161,7 +161,7 @@ class RKHSSHAPBase(ABC):
         sampling_correction = np.ones(n_coalitions)
 
         if sample_method == "weighted":
-            # For MC: correct for sampling bias only on randomly sampled coalitions
+            # For weighted: correct for sampling bias only on randomly sampled coalitions
             # Sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then uniform within size
             # P(coalition of size s) = P(size s) / C(m,s)
             # For unbiased estimation: weight = shapley_kernel / sampling_probability
