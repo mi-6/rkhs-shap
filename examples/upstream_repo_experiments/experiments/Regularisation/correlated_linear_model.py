@@ -98,9 +98,9 @@ class CorrelatedLinearModel(object):
         n = X.shape[0]
 
         if sample_method == "MC":
-            Z = sample_coalitions_weighted(self.m, num_samples)
+            Z, _ = sample_coalitions_weighted(self.m, num_samples)
         elif sample_method == "Full":
-            Z = sample_coalitions_full(self.m)
+            Z, _ = sample_coalitions_full(self.m)
 
         epoch = Z.shape[0]
         Y_target = np.zeros((epoch, n))

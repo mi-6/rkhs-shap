@@ -4,14 +4,17 @@ from math import comb
 import numpy as np
 
 
-def sample_coalitions_full(m: int) -> np.ndarray:
+def sample_coalitions_full(m: int) -> tuple[np.ndarray, np.ndarray]:
     """Generate all 2^m coalitions exhaustively.
 
     Args:
         m: Number of features
 
     Returns:
-        Boolean array of shape (2^m, m) with all possible coalitions
+        Tuple of (Z, is_sampled) where:
+        - Z: Boolean array of shape (2^m, m) with all possible coalitions
+        - is_sampled: Boolean array of shape (2^m,) indicating which coalitions
+          were randomly sampled (all False for exhaustive enumeration)
     """
     Z = np.zeros((2**m, m), dtype=bool)
 
@@ -22,10 +25,11 @@ def sample_coalitions_full(m: int) -> np.ndarray:
             count += 1
 
     Z[-1, :] = True
-    return Z
+    is_sampled = np.zeros(2**m, dtype=bool)
+    return Z, is_sampled
 
 
-def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
+def sample_coalitions_weighted(m: int, n_samples: int) -> tuple[np.ndarray, np.ndarray]:
     """Sample coalitions according to Shapley kernel weights.
 
     First samples coalition sizes proportional to their Shapley kernel weights,
@@ -36,8 +40,11 @@ def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
         n_samples: Number of samples
 
     Returns:
-        Boolean array of shape (n_samples + 2, m) with sampled coalitions.
-        Last two rows are empty and full coalitions.
+        Tuple of (Z, is_sampled) where:
+        - Z: Boolean array of shape (n_samples + 2, m) with sampled coalitions.
+          Last two rows are empty and full coalitions.
+        - is_sampled: Boolean array of shape (n_samples + 2,) indicating which
+          coalitions were randomly sampled (True for all except empty/full)
     """
     prob_vec = np.array([_shapley_kernel_weight(m, s) for s in range(1, m)])
     prob_vec /= prob_vec.sum()
@@ -51,7 +58,10 @@ def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
     Z[-2, :] = False
     Z[-1, :] = True
 
-    return Z
+    is_sampled = np.ones(n_samples + 2, dtype=bool)
+    is_sampled[-2:] = False
+
+    return Z, is_sampled
 
 
 def _shapley_kernel_weight(m: int, s: int) -> float:
@@ -75,7 +85,7 @@ def _enumerate_coalitions_of_size(m: int, size: int) -> np.ndarray:
     return coalitions
 
 
-def sample_coalitions_hybrid(m: int, n_samples: int) -> np.ndarray:
+def sample_coalitions_hybrid(m: int, n_samples: int) -> tuple[np.ndarray, np.ndarray]:
     """Hybrid exhaustive/random sampling following SHAP's KernelExplainer strategy.
 
     Exhaustively enumerates coalition sizes when the sample budget allows, then
@@ -87,13 +97,17 @@ def sample_coalitions_hybrid(m: int, n_samples: int) -> np.ndarray:
         n_samples: Requested number of samples
 
     Returns:
-        Boolean array of shape (n_total, m) where n_total >= min(2^m, n_samples + 2).
-        When exhaustive enumeration is possible, returns all 2^m coalitions.
-        Last two rows are always empty and full coalitions.
+        Tuple of (Z, is_sampled) where:
+        - Z: Boolean array of shape (n_total, m) where n_total >= min(2^m, n_samples + 2).
+          When exhaustive enumeration is possible, returns all 2^m coalitions.
+          Last two rows are always empty and full coalitions.
+        - is_sampled: Boolean array of shape (n_total,) indicating which coalitions
+          were randomly sampled (True) vs exhaustively enumerated (False)
     """
     from math import comb
 
     samples_container = []
+    is_sampled_container = []
     num_samples_left = n_samples
 
     weight_vec = np.array([_shapley_kernel_weight(m, s) for s in range(1, m)])
@@ -121,6 +135,7 @@ def sample_coalitions_hybrid(m: int, n_samples: int) -> np.ndarray:
         if samples_allocated_small >= num_combs_small - 1e-8:
             coalitions = _enumerate_coalitions_of_size(m, size_small)
             samples_container.append(coalitions)
+            is_sampled_container.append(np.zeros(num_combs_small, dtype=bool))
             num_samples_left -= num_combs_small
             remaining_weight_vec[size_small - 1] = 0
 
@@ -130,6 +145,7 @@ def sample_coalitions_hybrid(m: int, n_samples: int) -> np.ndarray:
         ):
             coalitions = _enumerate_coalitions_of_size(m, size_large)
             samples_container.append(coalitions)
+            is_sampled_container.append(np.zeros(num_combs_large, dtype=bool))
             num_samples_left -= num_combs_large
             remaining_weight_vec[size_large - 1] = 0
 
@@ -144,14 +160,18 @@ def sample_coalitions_hybrid(m: int, n_samples: int) -> np.ndarray:
             random_samples[i, np.random.choice(m, size=size, replace=False)] = True
 
         samples_container.append(random_samples)
+        is_sampled_container.append(np.ones(num_samples_left, dtype=bool))
 
     if samples_container:
         Z = np.vstack(samples_container)
+        is_sampled = np.concatenate(is_sampled_container)
     else:
         Z = np.empty((0, m), dtype=bool)
+        is_sampled = np.array([], dtype=bool)
 
     empty = np.zeros((1, m), dtype=bool)
     full = np.ones((1, m), dtype=bool)
     Z = np.vstack([Z, empty, full])
+    is_sampled = np.concatenate([is_sampled, [False, False]])
 
-    return Z
+    return Z, is_sampled

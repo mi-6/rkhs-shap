@@ -135,11 +135,11 @@ class RKHSSHAPBase(ABC):
         """
         m = self.m
         if sample_method == "MC":
-            Z = sample_coalitions_weighted(m, num_samples)
+            Z, is_sampled = sample_coalitions_weighted(m, num_samples)
         elif sample_method == "hybrid":
-            Z = sample_coalitions_hybrid(m, num_samples)
+            Z, is_sampled = sample_coalitions_hybrid(m, num_samples)
         else:
-            Z = sample_coalitions_full(m)
+            Z, is_sampled = sample_coalitions_full(m)
 
         n_coalitions = Z.shape[0]
         n_test = X_test.shape[0]
@@ -159,30 +159,26 @@ class RKHSSHAPBase(ABC):
             * (m - coalition_sizes[non_trivial])
         )
 
-        if sample_method == "MC" or sample_method == "hybrid":
-            # Correct for importance sampling bias in MC/hybrid sampling
-            # MC sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then samples uniformly within size
-            # So P(coalition of size s) = P(size s) / C(m,s)
+        # Importance sampling correction only for randomly sampled coalitions
+        sampling_correction = np.ones(n_coalitions)
+
+        if sample_method in ["MC", "hybrid"]:
+            # For MC/hybrid: correct for sampling bias only on randomly sampled coalitions
+            # Sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then uniform within size
+            # P(coalition of size s) = P(size s) / C(m,s)
             # For unbiased estimation: weight = shapley_kernel / sampling_probability
 
             prob_per_size = np.array([(m - 1) / (s * (m - s)) for s in range(1, m)])
             prob_per_size /= prob_per_size.sum()
-
-            # Map coalition sizes to their normalized probabilities
             size_to_prob = {s: prob_per_size[s - 1] for s in range(1, m)}
 
-            # Importance sampling correction: multiply by C(m,s) / P(size s)
-            sampling_correction = np.array(
-                [
-                    binomial_coeffs[i] / size_to_prob[int(s)]
-                    if 0 < s < m and int(s) in size_to_prob
-                    else 1.0
-                    for i, s in enumerate(coalition_sizes)
-                ]
-            )
+            # Apply correction ONLY to randomly sampled coalitions
+            for i in range(n_coalitions):
+                if is_sampled[i] and 0 < coalition_sizes[i] < m:
+                    s = int(coalition_sizes[i])
+                    if s in size_to_prob:
+                        sampling_correction[i] = binomial_coeffs[i] / size_to_prob[s]
 
-        else:
-            sampling_correction = 1.0
         weights = np.where(is_empty_or_full, 1e10, shapley_kernel * sampling_correction)
 
         if method == "O":
