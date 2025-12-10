@@ -12,7 +12,6 @@ from tqdm import tqdm
 
 from rkhs_shap.sampling import (
     sample_coalitions_full,
-    sample_coalitions_hybrid,
     sample_coalitions_weighted,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
@@ -124,8 +123,7 @@ class RKHSSHAPBase(ABC):
             X_test: Test points to explain, shape (n_test, m)
             method: "O" (Observational) or "I" (Interventional) Shapley values
             sample_method: Sampling strategy for coalitions:
-                - "MC": Monte Carlo sampling weighted by Shapley kernel
-                - "hybrid": Hybrid exhaustive/random sampling (SHAP KernelExplainer strategy)
+                - "weighted": Monte Carlo sampling weighted by Shapley kernel
                 - "full" or None: Enumerate all 2^m coalitions
             num_samples: Number of coalition samples (if using MC sampling)
             wls_reg: Regularization for weighted least squares fitting
@@ -134,12 +132,12 @@ class RKHSSHAPBase(ABC):
             SHAP values of shape (n_test, m)
         """
         m = self.m
-        if sample_method == "MC":
+        if sample_method == "weighted":
             Z, is_sampled = sample_coalitions_weighted(m, num_samples)
-        elif sample_method == "hybrid":
-            Z, is_sampled = sample_coalitions_hybrid(m, num_samples)
-        else:
+        elif sample_method == "full":
             Z, is_sampled = sample_coalitions_full(m)
+        else:
+            raise ValueError("sample_method must be either 'weighted' or 'full'")
 
         n_coalitions = Z.shape[0]
         n_test = X_test.shape[0]
@@ -162,8 +160,8 @@ class RKHSSHAPBase(ABC):
         # Importance sampling correction only for randomly sampled coalitions
         sampling_correction = np.ones(n_coalitions)
 
-        if sample_method in ["MC", "hybrid"]:
-            # For MC/hybrid: correct for sampling bias only on randomly sampled coalitions
+        if sample_method == "MC":
+            # For MC: correct for sampling bias only on randomly sampled coalitions
             # Sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then uniform within size
             # P(coalition of size s) = P(size s) / C(m,s)
             # For unbiased estimation: weight = shapley_kernel / sampling_probability
