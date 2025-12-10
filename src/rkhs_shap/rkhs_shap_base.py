@@ -13,7 +13,6 @@ from tqdm import tqdm
 from rkhs_shap.sampling import (
     sample_coalitions_full,
     sample_coalitions_hybrid,
-    sample_coalitions_uniform,
     sample_coalitions_weighted,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
@@ -127,7 +126,6 @@ class RKHSSHAPBase(ABC):
             sample_method: Sampling strategy for coalitions:
                 - "MC": Monte Carlo sampling weighted by Shapley kernel
                 - "hybrid": Hybrid exhaustive/random sampling (SHAP KernelExplainer strategy)
-                - "uniform": Uniform sampling from all coalitions
                 - "full" or None: Enumerate all 2^m coalitions
             num_samples: Number of coalition samples (if using MC sampling)
             wls_reg: Regularization for weighted least squares fitting
@@ -140,8 +138,6 @@ class RKHSSHAPBase(ABC):
             Z = sample_coalitions_weighted(m, num_samples)
         elif sample_method == "hybrid":
             Z = sample_coalitions_hybrid(m, num_samples)
-        elif sample_method == "uniform":
-            Z = sample_coalitions_uniform(m, num_samples)
         else:
             Z = sample_coalitions_full(m)
 

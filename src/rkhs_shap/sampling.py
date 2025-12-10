@@ -155,34 +155,3 @@ def sample_coalitions_hybrid(m: int, n_samples: int) -> np.ndarray:
     Z = np.vstack([Z, empty, full])
 
     return Z
-
-
-def sample_coalitions_uniform(m: int, n_samples: int) -> np.ndarray:
-    """Sample coalitions uniformly from all non-trivial coalitions.
-
-    Each coalition has equal probability, regardless of size. Use with full
-    Shapley kernel weights in regression for unbiased estimation.
-
-    More transparent than weighted sampling but may have higher variance since
-    it doesn't concentrate samples on high-weight coalition sizes.
-
-    Args:
-        m: Number of features
-        n_samples: Number of samples
-
-    Returns:
-        Boolean array of shape (n_samples + 2, m) with sampled coalitions.
-        Last two rows are empty and full coalitions.
-    """
-    Z = np.zeros((n_samples + 2, m), dtype=bool)
-
-    for i in range(n_samples):
-        coalition = np.random.rand(m) < 0.5
-        while coalition.sum() == 0 or coalition.sum() == m:
-            coalition = np.random.rand(m) < 0.5
-        Z[i] = coalition
-
-    Z[-2, :] = False
-    Z[-1, :] = True
-
-    return Z
