@@ -12,6 +12,8 @@ from tqdm import tqdm
 
 from rkhs_shap.sampling import (
     sample_coalitions_full,
+    sample_coalitions_hybrid,
+    sample_coalitions_uniform,
     sample_coalitions_weighted,
 )
 from rkhs_shap.subset_kernel import SubsetKernel
@@ -124,6 +126,8 @@ class RKHSSHAPBase(ABC):
             method: "O" (Observational) or "I" (Interventional) Shapley values
             sample_method: Sampling strategy for coalitions:
                 - "MC": Monte Carlo sampling weighted by Shapley kernel
+                - "hybrid": Hybrid exhaustive/random sampling (SHAP KernelExplainer strategy)
+                - "uniform": Uniform sampling from all coalitions
                 - "full" or None: Enumerate all 2^m coalitions
             num_samples: Number of coalition samples (if using MC sampling)
             wls_reg: Regularization for weighted least squares fitting
@@ -134,6 +138,10 @@ class RKHSSHAPBase(ABC):
         m = self.m
         if sample_method == "MC":
             Z = sample_coalitions_weighted(m, num_samples)
+        elif sample_method == "hybrid":
+            Z = sample_coalitions_hybrid(m, num_samples)
+        elif sample_method == "uniform":
+            Z = sample_coalitions_uniform(m, num_samples)
         else:
             Z = sample_coalitions_full(m)
 
@@ -155,8 +163,8 @@ class RKHSSHAPBase(ABC):
             * (m - coalition_sizes[non_trivial])
         )
 
-        if sample_method == "MC":
-            # Correct for importance sampling bias in MC sampling
+        if sample_method == "MC" or sample_method == "hybrid":
+            # Correct for importance sampling bias in MC/hybrid sampling
             # MC sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then samples uniformly within size
             # So P(coalition of size s) = P(size s) / C(m,s)
             # For unbiased estimation: weight = shapley_kernel / sampling_probability
