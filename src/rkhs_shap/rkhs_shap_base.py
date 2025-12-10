@@ -160,7 +160,7 @@ class RKHSSHAPBase(ABC):
         # Importance sampling correction only for randomly sampled coalitions
         sampling_correction = np.ones(n_coalitions)
 
-        if sample_method == "MC":
+        if sample_method == "weighted":
             # For MC: correct for sampling bias only on randomly sampled coalitions
             # Sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then uniform within size
             # P(coalition of size s) = P(size s) / C(m,s)

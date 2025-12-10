@@ -137,7 +137,7 @@ class ShapleyRegulariser(object):
         features_index: list,
         method: str = "O",
         num_samples: int = 300,
-        sample_method: str = "MC",
+        sample_method: str = "weighted",
     ):
         """[summary]
 
@@ -148,7 +148,7 @@ class ShapleyRegulariser(object):
             features_index (list): [list containing which feature to minimise]
             method (str, optional): ["O" stands for OSV-Reg and "I" stands for ISV-Reg]. Defaults to "O".
             num_samples (int, optional): [number of samples to estimate the shapley functionals]. Defaults to 300.
-            sample_method (str, optional): [sampling method to compute shapley functionals]. Defaults to "MC".
+            sample_method (str, optional): [sampling method to compute shapley functionals]. Defaults to "weighted".
         """
 
         self.X = X
@@ -170,7 +170,7 @@ class ShapleyRegulariser(object):
         self.Kx = Kx
 
         m_exclude_i = self.m - len(features_index)
-        if sample_method == "MC":
+        if sample_method == "weighted":
             Z_exclude_i, _ = sample_coalitions_weighted(m_exclude_i, num_samples)
         else:
             Z_exclude_i, _ = sample_coalitions_full(m_exclude_i)

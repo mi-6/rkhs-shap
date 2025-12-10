@@ -82,7 +82,7 @@ class CorrelatedLinearModel(object):
     def kernelSHAP(
         self,
         X: np.array,
-        sample_method: str = "Full",
+        sample_method: str = "full",
         num_samples: int = 1000,
         verbose: bool = True,
     ):
@@ -90,16 +90,16 @@ class CorrelatedLinearModel(object):
 
         Args:
             X (np.array): [data]
-            sample_method (str, optional): [description]. Defaults to "MC".
+            sample_method (str, optional): [description]. Defaults to "weighted".
             num_samples (int, optional): [description]. Defaults to 1000.
             verbose (bool, optional): [description]. Defaults to True.
         """
 
         n = X.shape[0]
 
-        if sample_method == "MC":
+        if sample_method == "weighted":
             Z, _ = sample_coalitions_weighted(self.m, num_samples)
-        elif sample_method == "Full":
+        elif sample_method == "full":
             Z, _ = sample_coalitions_full(self.m)
 
         epoch = Z.shape[0]
