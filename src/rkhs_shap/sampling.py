@@ -3,17 +3,14 @@ from itertools import combinations
 import numpy as np
 
 
-def sample_coalitions_full(m: int) -> tuple[np.ndarray, np.ndarray]:
+def sample_coalitions_full(m: int) -> np.ndarray:
     """Generate all 2^m coalitions exhaustively.
 
     Args:
         m: Number of features
 
     Returns:
-        Tuple of (Z, is_sampled) where:
-        - Z: Boolean array of shape (2^m, m) with all possible coalitions
-        - is_sampled: Boolean array of shape (2^m,) indicating which coalitions
-          were randomly sampled (all False for exhaustive enumeration)
+        Z: Boolean array of shape (2^m, m) with all possible coalitions
     """
     Z = np.zeros((2**m, m), dtype=bool)
 
@@ -24,11 +21,10 @@ def sample_coalitions_full(m: int) -> tuple[np.ndarray, np.ndarray]:
             count += 1
 
     Z[-1, :] = True
-    is_sampled = np.zeros(2**m, dtype=bool)
-    return Z, is_sampled
+    return Z
 
 
-def sample_coalitions_weighted(m: int, n_samples: int) -> tuple[np.ndarray, np.ndarray]:
+def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
     """Sample unique coalitions according to Shapley kernel weights.
 
     First samples coalition sizes proportional to their Shapley kernel weights,
@@ -40,11 +36,8 @@ def sample_coalitions_weighted(m: int, n_samples: int) -> tuple[np.ndarray, np.n
         n_samples: Target number of unique coalition samples
 
     Returns:
-        Tuple of (Z, is_sampled) where:
-        - Z: Boolean array of shape (n_unique + 2, m) with unique sampled coalitions.
-          Last two rows are empty and full coalitions.
-        - is_sampled: Boolean array of shape (n_unique + 2,) indicating which
-          coalitions were randomly sampled (True for all except empty/full)
+        Z: Boolean array of shape (n_unique + 2, m) with unique sampled coalitions.
+        Last two rows are empty and full coalitions.
     """
     prob_vec = np.array([_shapley_kernel_weight(m, s) for s in range(1, m)])
     prob_vec /= prob_vec.sum()
@@ -82,10 +75,7 @@ def sample_coalitions_weighted(m: int, n_samples: int) -> tuple[np.ndarray, np.n
     Z[-2, :] = False
     Z[-1, :] = True
 
-    is_sampled = np.ones(n_unique + 2, dtype=bool)
-    is_sampled[-2:] = False
-
-    return Z, is_sampled
+    return Z
 
 
 def _shapley_kernel_weight(m: int, s: int) -> float:
@@ -95,3 +85,41 @@ def _shapley_kernel_weight(m: int, s: int) -> float:
     of Shapley value estimation.
     """
     return (m - 1) / (s * (m - s))
+
+
+def compute_kernelshap_weights(Z: np.ndarray) -> np.ndarray:
+    """Compute weights matching KernelSHAP's per-size normalization.
+
+    For each coalition size s, the total weight equals the Shapley kernel
+    weight for that size: (m-1) / (s * (m-s)), normalized to sum to 1.
+    Each sampled coalition of size s shares this total weight equally.
+
+    Args:
+        Z: Boolean array of shape (n_coalitions, m) with coalition masks
+
+    Returns:
+        Weight array of shape (n_coalitions,)
+    """
+    m = Z.shape[1]
+    coalition_sizes = Z.sum(axis=1).astype(int)
+
+    target_weight_per_size = np.zeros(m + 1)
+    for s in range(1, m):
+        target_weight_per_size[s] = (m - 1) / (s * (m - s))
+
+    total_target = target_weight_per_size.sum()
+    target_weight_per_size /= total_target
+
+    size_counts = np.bincount(coalition_sizes, minlength=m + 1)
+
+    weight_per_coalition_by_size = np.zeros(m + 1)
+    for s in range(1, m):
+        if size_counts[s] > 0:
+            weight_per_coalition_by_size[s] = target_weight_per_size[s] / size_counts[s]
+
+    weights = weight_per_coalition_by_size[coalition_sizes]
+
+    is_empty_or_full = (coalition_sizes == 0) | (coalition_sizes == m)
+    weights[is_empty_or_full] = 1e10
+
+    return weights

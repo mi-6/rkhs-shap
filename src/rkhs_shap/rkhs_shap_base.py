@@ -10,6 +10,7 @@ from torch import Tensor
 from tqdm import tqdm
 
 from rkhs_shap.sampling import (
+    compute_kernelshap_weights,
     sample_coalitions_full,
     sample_coalitions_weighted,
 )
@@ -121,31 +122,7 @@ class RKHSSHAPBase(ABC):
         Returns:
             Weight array of shape (n_coalitions,)
         """
-        m = self.m
-        coalition_sizes = Z.sum(axis=1).astype(int)
-
-        target_weight_per_size = np.zeros(m + 1)
-        for s in range(1, m):
-            target_weight_per_size[s] = (m - 1) / (s * (m - s))
-
-        total_target = target_weight_per_size.sum()
-        target_weight_per_size /= total_target
-
-        size_counts = np.bincount(coalition_sizes, minlength=m + 1)
-
-        weight_per_coalition_by_size = np.zeros(m + 1)
-        for s in range(1, m):
-            if size_counts[s] > 0:
-                weight_per_coalition_by_size[s] = (
-                    target_weight_per_size[s] / size_counts[s]
-                )
-
-        weights = weight_per_coalition_by_size[coalition_sizes]
-
-        is_empty_or_full = (coalition_sizes == 0) | (coalition_sizes == m)
-        weights[is_empty_or_full] = 1e10
-
-        return weights
+        return compute_kernelshap_weights(Z)
 
     def fit(
         self,
@@ -171,9 +148,9 @@ class RKHSSHAPBase(ABC):
         """
         m = self.m
         if sample_method == "weighted":
-            Z, _ = sample_coalitions_weighted(m, num_samples)
+            Z = sample_coalitions_weighted(m, num_samples)
         elif sample_method == "full":
-            Z, _ = sample_coalitions_full(m)
+            Z = sample_coalitions_full(m)
         else:
             raise ValueError("sample_method must be either 'weighted' or 'full'")
 

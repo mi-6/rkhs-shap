@@ -171,9 +171,9 @@ class ShapleyRegulariser(object):
 
         m_exclude_i = self.m - len(features_index)
         if sample_method == "weighted":
-            Z_exclude_i, _ = sample_coalitions_weighted(m_exclude_i, num_samples)
+            Z_exclude_i = sample_coalitions_weighted(m_exclude_i, num_samples)
         else:
-            Z_exclude_i, _ = sample_coalitions_full(m_exclude_i)
+            Z_exclude_i = sample_coalitions_full(m_exclude_i)
         A = np.zeros((self.n, self.n))
 
         for row in tqdm(Z_exclude_i):
