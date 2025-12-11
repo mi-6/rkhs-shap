@@ -5,7 +5,6 @@ from copy import deepcopy
 import numpy as np
 import torch
 from gpytorch.kernels import Kernel
-from sklearn.linear_model import Ridge
 from torch import Tensor
 from tqdm import tqdm
 
@@ -16,6 +15,42 @@ from rkhs_shap.sampling import (
 )
 from rkhs_shap.subset_kernel import SubsetKernel
 from rkhs_shap.utils import freeze_parameters, to_tensor
+
+
+def weighted_ridge(
+    X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray, alpha: float = 1.0
+) -> np.ndarray:
+    """Fit weighted ridge regression using closed-form solution.
+
+    Solves: argmin_w ||W^(1/2)(Xw - y)||^2 + alpha||w||^2
+    where W = diag(sample_weight)
+
+    Args:
+        X: Feature matrix of shape (n_samples, n_features)
+        y: Target matrix of shape (n_samples, n_targets)
+        sample_weight: Sample weights of shape (n_samples,)
+        alpha: Regularization strength
+
+    Returns:
+        Coefficients of shape (n_targets, n_features)
+    """
+    X_torch = torch.from_numpy(X).double()
+    y_torch = torch.from_numpy(y).double()
+    W_sqrt = torch.sqrt(torch.from_numpy(sample_weight).double()).unsqueeze(1)
+
+    X_weighted = X_torch * W_sqrt
+    y_weighted = y_torch * W_sqrt
+
+    n_features = X.shape[1]
+    regularizer = alpha * torch.eye(n_features, dtype=torch.float64)
+
+    # Solve (X^T W X + alpha*I) w = X^T W y
+    XtWX = X_weighted.T @ X_weighted
+    Xtwy = X_weighted.T @ y_weighted
+
+    coef = torch.linalg.solve(XtWX + regularizer, Xtwy)
+
+    return coef.T.numpy()
 
 
 class RKHSSHAPBase(ABC):
@@ -170,9 +205,7 @@ class RKHSSHAPBase(ABC):
         for idx, row in enumerate(tqdm(Z)):
             Y_target[idx, :] = value_fn(row, X_test)
 
-        clf = Ridge(wls_reg)
-        clf.fit(Z, Y_target, sample_weight=weights)
-
-        shap_values = clf.coef_
+        shap_values = weighted_ridge(Z, Y_target, sample_weight=weights, alpha=wls_reg)
+        # shap_values = Ridge(wls_reg).fit(Z, Y_target, sample_weight=weights).coef_
 
         return shap_values
