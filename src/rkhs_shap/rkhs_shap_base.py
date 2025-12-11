@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import deepcopy
-from math import comb
 
 import numpy as np
 import torch
@@ -11,6 +10,7 @@ from torch import Tensor
 from tqdm import tqdm
 
 from rkhs_shap.sampling import (
+    compute_kernelshap_weights,
     sample_coalitions_full,
     sample_coalitions_weighted,
 )
@@ -109,6 +109,21 @@ class RKHSSHAPBase(ABC):
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
         return S_kernel, Sc_kernel
 
+    def _compute_kernelshap_weights(self, Z: np.ndarray) -> np.ndarray:
+        """Compute weights matching KernelSHAP's per-size normalization.
+
+        For each coalition size s, the total weight equals the Shapley kernel
+        weight for that size: (m-1) / (s * (m-s)), normalized to sum to 1.
+        Each sampled coalition of size s shares this total weight equally.
+
+        Args:
+            Z: Boolean array of shape (n_coalitions, m) with coalition masks
+
+        Returns:
+            Weight array of shape (n_coalitions,)
+        """
+        return compute_kernelshap_weights(Z)
+
     def fit(
         self,
         X_test: Tensor,
@@ -123,7 +138,7 @@ class RKHSSHAPBase(ABC):
             X_test: Test points to explain, shape (n_test, m)
             method: "O" (Observational) or "I" (Interventional) Shapley values
             sample_method: Sampling strategy for coalitions:
-                - "MC": Monte Carlo sampling weighted by Shapley kernel
+                - "weighted": Monte Carlo sampling weighted by Shapley kernel
                 - "full" or None: Enumerate all 2^m coalitions
             num_samples: Number of coalition samples (if using MC sampling)
             wls_reg: Regularization for weighted least squares fitting
@@ -132,54 +147,18 @@ class RKHSSHAPBase(ABC):
             SHAP values of shape (n_test, m)
         """
         m = self.m
-        if sample_method == "MC":
+        if sample_method == "weighted":
             Z = sample_coalitions_weighted(m, num_samples)
-        else:
+        elif sample_method == "full":
             Z = sample_coalitions_full(m)
+        else:
+            raise ValueError("sample_method must be either 'weighted' or 'full'")
 
         n_coalitions = Z.shape[0]
         n_test = X_test.shape[0]
         Y_target = np.zeros((n_coalitions, n_test))
 
-        coalition_sizes = Z.sum(axis=1)
-        is_empty_or_full = (coalition_sizes == 0) | (coalition_sizes == m)
-
-        binomial_coeffs = np.array([comb(m, int(s)) for s in coalition_sizes])
-
-        # Compute Shapley kernel weights only for non-trivial coalitions
-        shapley_kernel = np.zeros_like(coalition_sizes, dtype=float)
-        non_trivial = ~is_empty_or_full
-        shapley_kernel[non_trivial] = (m - 1) / (
-            binomial_coeffs[non_trivial]
-            * coalition_sizes[non_trivial]
-            * (m - coalition_sizes[non_trivial])
-        )
-
-        if sample_method == "MC":
-            # Correct for importance sampling bias in MC sampling
-            # MC sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then samples uniformly within size
-            # So P(coalition of size s) = P(size s) / C(m,s)
-            # For unbiased estimation: weight = shapley_kernel / sampling_probability
-
-            prob_per_size = np.array([(m - 1) / (s * (m - s)) for s in range(1, m)])
-            prob_per_size /= prob_per_size.sum()
-
-            # Map coalition sizes to their normalized probabilities
-            size_to_prob = {s: prob_per_size[s - 1] for s in range(1, m)}
-
-            # Importance sampling correction: multiply by C(m,s) / P(size s)
-            sampling_correction = np.array(
-                [
-                    binomial_coeffs[i] / size_to_prob[int(s)]
-                    if 0 < s < m and int(s) in size_to_prob
-                    else 1.0
-                    for i, s in enumerate(coalition_sizes)
-                ]
-            )
-
-        else:
-            sampling_correction = 1.0
-        weights = np.where(is_empty_or_full, 1e10, shapley_kernel * sampling_correction)
+        weights = self._compute_kernelshap_weights(Z)
 
         if method == "O":
             value_fn = self._value_observation

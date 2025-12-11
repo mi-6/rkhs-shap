@@ -9,7 +9,28 @@ from rkhs_shap.rkhs_shap_base import RKHSSHAPBase
 
 
 class RKHSSHAP(RKHSSHAPBase):
-    """Implement the exact RKHS SHAP algorithm with no kernel approximation"""
+    """Exact RKHS-SHAP algorithm with no kernel approximation.
+
+    Important: GP Fit Quality Dependency
+    -------------------------------------
+    RKHS-SHAP accuracy depends critically on the quality of the GP/kernel fit.
+    The kernel parameters (especially lengthscales) and noise_var both affect
+    the computed Shapley values:
+
+    - **Lengthscales**: Control how feature similarity is computed in value
+      functions. Poorly fitted lengthscales lead to incorrect coalition values.
+    - **noise_var**: Controls KRR regularization. High values (>0.3) typically
+      indicate a poorly fitted GP and will cause over-smoothed predictions.
+
+    For best results:
+    1. Train the GP for sufficient iterations (typically 50-200) until the
+       marginal log-likelihood converges
+    2. Check that noise_var has decreased to a reasonable value (<0.1)
+    3. Verify the GP achieves reasonable R² on held-out data
+
+    If using a poorly fitted GP (e.g., 1-10 training iterations), expect
+    correlation with Kernel SHAP to be ~0.85-0.92 instead of >0.99.
+    """
 
     def __init__(
         self,
@@ -25,10 +46,13 @@ class RKHSSHAP(RKHSSHAPBase):
         Args:
             X: Training features of shape (n, m)
             y: Training targets of shape (n,) or (n, 1)
-            kernel: Fitted kernel (e.g., RBFKernel, MaternKernel)
+            kernel: Fitted kernel (e.g., RBFKernel, MaternKernel). The kernel's
+                lengthscale parameters significantly affect SHAP value accuracy.
+                Use a properly trained kernel for best results.
             noise_var: KRR regularization parameter. Corresponds to the noise variance
-                in Gaussian Process formulation. If you've fit a GP model, set this to
-                model.likelihood.noise_covar.noise for equivalent predictions.
+                in Gaussian Process formulation. If you've fit a GP model, use
+                model.likelihood.noise.item() for equivalent predictions. Values
+                above 0.3 suggest the GP may be poorly fitted.
             cme_reg: Regularization for conditional/marginal mean embeddings.
                 Only used in observational value function.
             mean_function: Optional mean function m(x). If provided, KRR will fit

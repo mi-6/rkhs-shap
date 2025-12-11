@@ -224,7 +224,7 @@ def test_exact_rkhs_shap_mc_sampling():
     """Test exact RKHS-SHAP with MC sampling on higher-dimensional synthetic data.
 
     This test verifies:
-    1. RKHS-SHAP works with Monte Carlo coalition sampling (sample_method="MC")
+    1. RKHS-SHAP works with Monte Carlo coalition sampling (sample_method="weighted")
     2. MC sampling produces reasonable results on problems where full enumeration is infeasible
     3. Additivity property is approximately satisfied with MC sampling
     """
@@ -264,7 +264,7 @@ def test_exact_rkhs_shap_mc_sampling():
     shap_values_I = rkhs_shap.fit(
         X_test=X_explain,
         method="I",
-        sample_method="MC",
+        sample_method="weighted",
         num_samples=500,
     )
 
