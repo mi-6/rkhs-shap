@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import deepcopy
-from math import comb
 
 import numpy as np
 import torch
@@ -109,6 +108,45 @@ class RKHSSHAPBase(ABC):
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
         return S_kernel, Sc_kernel
 
+    def _compute_kernelshap_weights(self, Z: np.ndarray) -> np.ndarray:
+        """Compute weights matching KernelSHAP's per-size normalization.
+
+        For each coalition size s, the total weight equals the Shapley kernel
+        weight for that size: (m-1) / (s * (m-s)), normalized to sum to 1.
+        Each sampled coalition of size s shares this total weight equally.
+
+        Args:
+            Z: Boolean array of shape (n_coalitions, m) with coalition masks
+
+        Returns:
+            Weight array of shape (n_coalitions,)
+        """
+        m = self.m
+        coalition_sizes = Z.sum(axis=1).astype(int)
+
+        target_weight_per_size = np.zeros(m + 1)
+        for s in range(1, m):
+            target_weight_per_size[s] = (m - 1) / (s * (m - s))
+
+        total_target = target_weight_per_size.sum()
+        target_weight_per_size /= total_target
+
+        size_counts = np.bincount(coalition_sizes, minlength=m + 1)
+
+        weight_per_coalition_by_size = np.zeros(m + 1)
+        for s in range(1, m):
+            if size_counts[s] > 0:
+                weight_per_coalition_by_size[s] = (
+                    target_weight_per_size[s] / size_counts[s]
+                )
+
+        weights = weight_per_coalition_by_size[coalition_sizes]
+
+        is_empty_or_full = (coalition_sizes == 0) | (coalition_sizes == m)
+        weights[is_empty_or_full] = 1e10
+
+        return weights
+
     def fit(
         self,
         X_test: Tensor,
@@ -133,9 +171,9 @@ class RKHSSHAPBase(ABC):
         """
         m = self.m
         if sample_method == "weighted":
-            Z, is_sampled = sample_coalitions_weighted(m, num_samples)
+            Z, _ = sample_coalitions_weighted(m, num_samples)
         elif sample_method == "full":
-            Z, is_sampled = sample_coalitions_full(m)
+            Z, _ = sample_coalitions_full(m)
         else:
             raise ValueError("sample_method must be either 'weighted' or 'full'")
 
@@ -143,41 +181,7 @@ class RKHSSHAPBase(ABC):
         n_test = X_test.shape[0]
         Y_target = np.zeros((n_coalitions, n_test))
 
-        coalition_sizes = Z.sum(axis=1)
-        is_empty_or_full = (coalition_sizes == 0) | (coalition_sizes == m)
-
-        binomial_coeffs = np.array([comb(m, int(s)) for s in coalition_sizes])
-
-        # Compute Shapley kernel weights only for non-trivial coalitions
-        shapley_kernel = np.zeros_like(coalition_sizes, dtype=float)
-        non_trivial = ~is_empty_or_full
-        shapley_kernel[non_trivial] = (m - 1) / (
-            binomial_coeffs[non_trivial]
-            * coalition_sizes[non_trivial]
-            * (m - coalition_sizes[non_trivial])
-        )
-
-        # Importance sampling correction only for randomly sampled coalitions
-        sampling_correction = np.ones(n_coalitions)
-
-        if sample_method == "weighted":
-            # For weighted: correct for sampling bias only on randomly sampled coalitions
-            # Sampling uses P(size s) ∝ (m-1)/(s*(m-s)), then uniform within size
-            # P(coalition of size s) = P(size s) / C(m,s)
-            # For unbiased estimation: weight = shapley_kernel / sampling_probability
-
-            prob_per_size = np.array([(m - 1) / (s * (m - s)) for s in range(1, m)])
-            prob_per_size /= prob_per_size.sum()
-            size_to_prob = {s: prob_per_size[s - 1] for s in range(1, m)}
-
-            # Apply correction ONLY to randomly sampled coalitions
-            for i in range(n_coalitions):
-                if is_sampled[i] and 0 < coalition_sizes[i] < m:
-                    s = int(coalition_sizes[i])
-                    if s in size_to_prob:
-                        sampling_correction[i] = binomial_coeffs[i] / size_to_prob[s]
-
-        weights = np.where(is_empty_or_full, 1e10, shapley_kernel * sampling_correction)
+        weights = self._compute_kernelshap_weights(Z)
 
         if method == "O":
             value_fn = self._value_observation

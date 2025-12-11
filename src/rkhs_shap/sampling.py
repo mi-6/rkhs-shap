@@ -29,35 +29,60 @@ def sample_coalitions_full(m: int) -> tuple[np.ndarray, np.ndarray]:
 
 
 def sample_coalitions_weighted(m: int, n_samples: int) -> tuple[np.ndarray, np.ndarray]:
-    """Sample coalitions according to Shapley kernel weights.
+    """Sample unique coalitions according to Shapley kernel weights.
 
     First samples coalition sizes proportional to their Shapley kernel weights,
-    then uniformly samples a specific coalition of that size.
+    then uniformly samples a specific coalition of that size. Duplicates are
+    removed to ensure each coalition appears exactly once.
 
     Args:
         m: Number of features
-        n_samples: Number of samples
+        n_samples: Target number of unique coalition samples
 
     Returns:
         Tuple of (Z, is_sampled) where:
-        - Z: Boolean array of shape (n_samples + 2, m) with sampled coalitions.
+        - Z: Boolean array of shape (n_unique + 2, m) with unique sampled coalitions.
           Last two rows are empty and full coalitions.
-        - is_sampled: Boolean array of shape (n_samples + 2,) indicating which
+        - is_sampled: Boolean array of shape (n_unique + 2,) indicating which
           coalitions were randomly sampled (True for all except empty/full)
     """
     prob_vec = np.array([_shapley_kernel_weight(m, s) for s in range(1, m)])
     prob_vec /= prob_vec.sum()
 
-    sizes = np.random.choice(range(1, m), p=prob_vec, size=n_samples, replace=True)
+    seen: set[tuple[bool, ...]] = set()
+    coalitions: list[np.ndarray] = []
 
-    Z = np.zeros((n_samples + 2, m), dtype=bool)
-    for i, size in enumerate(sizes):
-        Z[i, np.random.choice(m, size=size, replace=False)] = True
+    # Oversample to account for duplicates, then deduplicate
+    batch_size = n_samples
+    max_attempts = 10
+
+    for _ in range(max_attempts):
+        sizes = np.random.choice(range(1, m), p=prob_vec, size=batch_size, replace=True)
+
+        for size in sizes:
+            coalition = np.zeros(m, dtype=bool)
+            coalition[np.random.choice(m, size=size, replace=False)] = True
+            key = tuple(coalition)
+
+            if key not in seen:
+                seen.add(key)
+                coalitions.append(coalition)
+
+                if len(coalitions) >= n_samples:
+                    break
+
+        if len(coalitions) >= n_samples:
+            break
+
+    n_unique = len(coalitions)
+    Z = np.zeros((n_unique + 2, m), dtype=bool)
+    for i, coalition in enumerate(coalitions):
+        Z[i] = coalition
 
     Z[-2, :] = False
     Z[-1, :] = True
 
-    is_sampled = np.ones(n_samples + 2, dtype=bool)
+    is_sampled = np.ones(n_unique + 2, dtype=bool)
     is_sampled[-2:] = False
 
     return Z, is_sampled

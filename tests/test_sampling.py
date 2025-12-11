@@ -27,9 +27,11 @@ def test_sample_coalitions_full(m):
 def test_sample_coalitions_weighted(m, n_samples):
     Z, is_sampled = sample_coalitions_weighted(m, n_samples)
 
-    assert Z.shape == (n_samples + 2, m)
+    n_unique = Z.shape[0] - 2
+    assert n_unique <= n_samples
+    assert Z.shape == (n_unique + 2, m)
     assert Z.dtype == bool
-    assert is_sampled.shape == (n_samples + 2,)
+    assert is_sampled.shape == (n_unique + 2,)
     assert is_sampled.dtype == bool
     assert np.all(is_sampled[:-2])
     assert not is_sampled[-2]
@@ -39,6 +41,11 @@ def test_sample_coalitions_weighted(m, n_samples):
 
     coalition_sizes = Z[:-2].sum(axis=1)
     assert len(np.unique(coalition_sizes)) > 1
+
+    # All sampled coalitions should be unique
+    sampled_coalitions = Z[:-2]
+    unique_rows = np.unique(sampled_coalitions, axis=0)
+    assert len(unique_rows) == n_unique
 
 
 if __name__ == "__main__":
