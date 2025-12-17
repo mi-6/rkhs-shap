@@ -18,8 +18,8 @@ from rkhs_shap.utils import freeze_parameters, to_tensor
 
 
 def weighted_ridge(
-    X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray, alpha: float = 1.0
-) -> np.ndarray:
+    X: Tensor, y: Tensor, sample_weight: Tensor, alpha: float = 1.0
+) -> Tensor:
     """Fit weighted ridge regression using closed-form solution.
 
     Solves: argmin_w ||W^(1/2)(Xw - y)||^2 + alpha||w||^2
@@ -34,12 +34,10 @@ def weighted_ridge(
     Returns:
         Coefficients of shape (n_targets, n_features)
     """
-    X_torch = torch.from_numpy(X).double()
-    y_torch = torch.from_numpy(y).double()
-    W_sqrt = torch.sqrt(torch.from_numpy(sample_weight).double()).unsqueeze(1)
+    W_sqrt = torch.sqrt(sample_weight).unsqueeze(1)
 
-    X_weighted = X_torch * W_sqrt
-    y_weighted = y_torch * W_sqrt
+    X_weighted = X * W_sqrt
+    y_weighted = y * W_sqrt
 
     n_features = X.shape[1]
     regularizer = alpha * torch.eye(n_features, dtype=torch.float64)
@@ -50,7 +48,7 @@ def weighted_ridge(
 
     coef = torch.linalg.solve(XtWX + regularizer, Xtwy)
 
-    return coef.T.numpy()
+    return coef.T
 
 
 class RKHSSHAPBase(ABC):
@@ -144,21 +142,6 @@ class RKHSSHAPBase(ABC):
         Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
         return S_kernel, Sc_kernel
 
-    def _compute_kernelshap_weights(self, Z: np.ndarray) -> np.ndarray:
-        """Compute weights matching KernelSHAP's per-size normalization.
-
-        For each coalition size s, the total weight equals the Shapley kernel
-        weight for that size: (m-1) / (s * (m-s)), normalized to sum to 1.
-        Each sampled coalition of size s shares this total weight equally.
-
-        Args:
-            Z: Boolean array of shape (n_coalitions, m) with coalition masks
-
-        Returns:
-            Weight array of shape (n_coalitions,)
-        """
-        return compute_kernelshap_weights(Z)
-
     def fit(
         self,
         X_test: Tensor,
@@ -191,9 +174,10 @@ class RKHSSHAPBase(ABC):
 
         n_coalitions = Z.shape[0]
         n_test = X_test.shape[0]
-        Y_target = np.zeros((n_coalitions, n_test))
+        Y_target = torch.zeros((n_coalitions, n_test), dtype=torch.float64)
 
-        weights = self._compute_kernelshap_weights(Z)
+        weights = compute_kernelshap_weights(Z)
+        weights = torch.from_numpy(weights)
 
         if method == "O":
             value_fn = self._value_observation
@@ -205,7 +189,8 @@ class RKHSSHAPBase(ABC):
         for idx, row in enumerate(tqdm(Z)):
             Y_target[idx, :] = value_fn(row, X_test)
 
+        Z = torch.from_numpy(Z)
         shap_values = weighted_ridge(Z, Y_target, sample_weight=weights, alpha=wls_reg)
         # shap_values = Ridge(wls_reg).fit(Z, Y_target, sample_weight=weights).coef_
 
-        return shap_values
+        return shap_values.numpy()
