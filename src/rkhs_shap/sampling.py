@@ -57,12 +57,12 @@ def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
             coalition[np.random.choice(m, size=size, replace=False)] = True
             key = tuple(coalition)
 
-            if key not in seen:
-                seen.add(key)
-                coalitions.append(coalition)
-
-                if len(coalitions) >= n_samples:
-                    break
+            if key in seen:
+                continue
+            seen.add(key)
+            coalitions.append(coalition)
+            if len(coalitions) >= n_samples:
+                break
 
         if len(coalitions) >= n_samples:
             break
