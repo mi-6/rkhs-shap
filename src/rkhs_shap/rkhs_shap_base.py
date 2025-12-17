@@ -148,7 +148,7 @@ class RKHSSHAPBase(ABC):
         method: str,
         sample_method: str,
         num_samples: int = 100,
-        wls_reg: float = 0.01,  # TODO: consider decreasing the default
+        wls_reg: float = 1e-8,
     ) -> np.ndarray:
         """Compute RKHS-SHAP values for test points.
 
@@ -191,6 +191,5 @@ class RKHSSHAPBase(ABC):
 
         Z = torch.from_numpy(Z)
         shap_values = weighted_ridge(Z, Y_target, sample_weight=weights, alpha=wls_reg)
-        # shap_values = Ridge(wls_reg).fit(Z, Y_target, sample_weight=weights).coef_
 
         return shap_values.numpy()
