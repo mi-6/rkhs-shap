@@ -316,9 +316,11 @@ def test_exact_rkhs_shap_reproducibility():
         mean_function=gp.mean_module,
     )
 
-    # Test 1: Default RNG (no parameter) produces identical results
-    shap_1 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100)
-    shap_2 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100)
+    # Test 1: Explicit RNG produces identical results
+    rng1 = np.random.default_rng(42)
+    rng2 = np.random.default_rng(42)
+    shap_1 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100, rng=rng1)
+    shap_2 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100, rng=rng2)
     np.testing.assert_array_equal(shap_1, shap_2)
 
     # Test 2: Passing same RNG produces identical results

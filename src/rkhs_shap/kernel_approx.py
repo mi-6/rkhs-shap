@@ -13,14 +13,14 @@ class Nystroem:
     """
 
     def __init__(
-        self, kernel: Kernel, n_components: int, random_state: int = 42
+        self, kernel: Kernel, n_components: int, random_state: int | None = None
     ) -> None:
         """Initialize Nyström approximation.
 
         Args:
             kernel: GPyTorch kernel (already fitted with appropriate lengthscale)
             n_components: Number of landmark points for approximation
-            random_state: Random state for KMeans clustering. If None, uses 42 for reproducibility.
+            random_state: Random state for KMeans clustering. If None, uses non-deterministic randomness.
         """
         self.kernel = kernel
         self.n_components = n_components

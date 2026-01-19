@@ -161,7 +161,7 @@ class RKHSSHAPBase(ABC):
                 - "full" or None: Enumerate all 2^m coalitions
             num_samples: Number of coalition samples (if using MC sampling)
             wls_reg: Regularization for weighted least squares fitting
-            rng: Optional numpy random generator for reproducibility.
+            rng: Optional numpy random generator. If None, uses non-deterministic randomness.
 
         Returns:
             SHAP values of shape (n_test, m)

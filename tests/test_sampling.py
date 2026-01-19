@@ -42,9 +42,11 @@ def test_sample_coalitions_weighted(m, n_samples):
 
 @pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100)])
 def test_sample_coalitions_weighted_reproducibility_default(m, n_samples):
-    """Test that default RNG (no parameter) produces identical results."""
-    Z1 = sample_coalitions_weighted(m, n_samples)
-    Z2 = sample_coalitions_weighted(m, n_samples)
+    """Test that passing explicit RNG produces identical results."""
+    rng1 = np.random.default_rng(42)
+    rng2 = np.random.default_rng(42)
+    Z1 = sample_coalitions_weighted(m, n_samples, rng=rng1)
+    Z2 = sample_coalitions_weighted(m, n_samples, rng=rng2)
     np.testing.assert_array_equal(Z1, Z2)
 
 

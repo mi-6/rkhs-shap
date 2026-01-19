@@ -198,9 +198,11 @@ def test_approx_rkhs_shap_reproducibility():
             random_state=random_state,
         )
 
-    # Test 1: Default random_state produces identical results
-    shap_1 = create_model().fit(X_explain, "I", "weighted", num_samples=100)
-    shap_2 = create_model().fit(X_explain, "I", "weighted", num_samples=100)
+    # Test 1: Explicit random_state + RNG produces identical results
+    rng1 = np.random.default_rng(42)
+    rng2 = np.random.default_rng(42)
+    shap_1 = create_model(42).fit(X_explain, "I", "weighted", num_samples=100, rng=rng1)
+    shap_2 = create_model(42).fit(X_explain, "I", "weighted", num_samples=100, rng=rng2)
     np.testing.assert_array_equal(shap_1, shap_2)
 
     # Test 2: Same random_state + same RNG produces identical results
@@ -214,8 +216,14 @@ def test_approx_rkhs_shap_reproducibility():
     np.testing.assert_array_equal(shap_3, shap_4)
 
     # Test 3: Different random_states produce different SHAP values
-    shap_5 = create_model(111).fit(X_explain, "I", "weighted", num_samples=100)
-    shap_6 = create_model(222).fit(X_explain, "I", "weighted", num_samples=100)
+    rng1 = np.random.default_rng(100)
+    rng2 = np.random.default_rng(100)
+    shap_5 = create_model(111).fit(
+        X_explain, "I", "weighted", num_samples=100, rng=rng1
+    )
+    shap_6 = create_model(222).fit(
+        X_explain, "I", "weighted", num_samples=100, rng=rng2
+    )
     assert not np.allclose(shap_5, shap_6, rtol=1e-5)
 
 

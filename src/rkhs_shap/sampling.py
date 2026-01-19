@@ -36,14 +36,14 @@ def sample_coalitions_weighted(
     Args:
         m: Number of features
         n_samples: Target number of unique coalition samples
-        rng: Optional numpy random generator. If None, uses default for reproducibility.
+        rng: Optional numpy random generator. If None, uses non-deterministic randomness.
 
     Returns:
         Z: Boolean array of shape (n_unique + 2, m) with unique sampled coalitions.
         Last two rows are empty and full coalitions.
     """
     if rng is None:
-        rng = np.random.default_rng(42)
+        rng = np.random.default_rng()
 
     prob_vec = np.array([_shapley_kernel_weight(m, s) for s in range(1, m)])
     prob_vec /= prob_vec.sum()
