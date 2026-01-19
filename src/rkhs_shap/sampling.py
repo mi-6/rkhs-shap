@@ -24,7 +24,9 @@ def sample_coalitions_full(m: int) -> np.ndarray:
     return Z
 
 
-def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
+def sample_coalitions_weighted(
+    m: int, n_samples: int, rng: np.random.Generator | None = None
+) -> np.ndarray:
     """Sample unique coalitions according to Shapley kernel weights.
 
     First samples coalition sizes proportional to their Shapley kernel weights,
@@ -34,11 +36,15 @@ def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
     Args:
         m: Number of features
         n_samples: Target number of unique coalition samples
+        rng: Optional numpy random generator. If None, uses default for reproducibility.
 
     Returns:
         Z: Boolean array of shape (n_unique + 2, m) with unique sampled coalitions.
         Last two rows are empty and full coalitions.
     """
+    if rng is None:
+        rng = np.random.default_rng(42)
+
     prob_vec = np.array([_shapley_kernel_weight(m, s) for s in range(1, m)])
     prob_vec /= prob_vec.sum()
 
@@ -50,11 +56,11 @@ def sample_coalitions_weighted(m: int, n_samples: int) -> np.ndarray:
     max_attempts = 10
 
     for _ in range(max_attempts):
-        sizes = np.random.choice(range(1, m), p=prob_vec, size=batch_size, replace=True)
+        sizes = rng.choice(range(1, m), p=prob_vec, size=batch_size, replace=True)
 
         for size in sizes:
             coalition = np.zeros(m, dtype=bool)
-            coalition[np.random.choice(m, size=size, replace=False)] = True
+            coalition[rng.choice(m, size=size, replace=False)] = True
             key = tuple(coalition)
 
             if key in seen:
