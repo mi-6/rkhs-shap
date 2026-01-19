@@ -149,6 +149,7 @@ class RKHSSHAPBase(ABC):
         sample_method: str,
         num_samples: int = 100,
         wls_reg: float = 1e-8,
+        rng: np.random.Generator | None = None,
     ) -> np.ndarray:
         """Compute RKHS-SHAP values for test points.
 
@@ -160,13 +161,14 @@ class RKHSSHAPBase(ABC):
                 - "full" or None: Enumerate all 2^m coalitions
             num_samples: Number of coalition samples (if using MC sampling)
             wls_reg: Regularization for weighted least squares fitting
+            rng: Optional numpy random generator for reproducibility.
 
         Returns:
             SHAP values of shape (n_test, m)
         """
         m = self.m
         if sample_method == "weighted":
-            Z = sample_coalitions_weighted(m, num_samples)
+            Z = sample_coalitions_weighted(m, num_samples, rng=rng)
         elif sample_method == "full":
             Z = sample_coalitions_full(m)
         else:

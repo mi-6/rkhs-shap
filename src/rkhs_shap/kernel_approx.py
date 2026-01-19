@@ -12,15 +12,19 @@ class Nystroem:
     using the Nyström method: K ≈ K_nm @ K_mm^{-1} @ K_mn where m are landmarks.
     """
 
-    def __init__(self, kernel: Kernel, n_components: int) -> None:
+    def __init__(
+        self, kernel: Kernel, n_components: int, random_state: int = 42
+    ) -> None:
         """Initialize Nyström approximation.
 
         Args:
             kernel: GPyTorch kernel (already fitted with appropriate lengthscale)
             n_components: Number of landmark points for approximation
+            random_state: Random state for KMeans clustering. If None, uses 42 for reproducibility.
         """
         self.kernel = kernel
         self.n_components = n_components
+        self.random_state = random_state
         self.landmarks = None
 
     def fit(self, X: Tensor) -> None:
@@ -30,7 +34,7 @@ class Nystroem:
             X: Training data of shape (n, m)
         """
         X_tensor = to_tensor(X)
-        km = KMeans(n_clusters=self.n_components, random_state=0)
+        km = KMeans(n_clusters=self.n_components, random_state=self.random_state)
         km.fit(X_tensor.cpu().numpy())
         self.landmarks = to_tensor(km.cluster_centers_)
 

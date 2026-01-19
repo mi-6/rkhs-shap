@@ -65,7 +65,7 @@ def test_sample_coalitions_weighted_different_seeds(m, n_samples):
     rng2 = np.random.default_rng(456)
     Z1 = sample_coalitions_weighted(m, n_samples, rng=rng1)
     Z2 = sample_coalitions_weighted(m, n_samples, rng=rng2)
-    assert not np.array_equal(Z1[:-2], Z2[:-2])
+    assert not np.array_equal(Z1, Z2)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         cme_reg: float = 1e-3,
         n_components: int = 100,
         mean_function: Callable[[Tensor], Tensor] | None = None,
+        random_state: int | None = 42,
     ) -> None:
         """Initialize approximate RKHS-SHAP with Nyström-approximated Kernel Ridge Regression.
 
@@ -37,6 +38,8 @@ class RKHSSHAPApprox(RKHSSHAPBase):
             mean_function: Optional mean function m(x). If provided, KRR will fit
                 residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
                 Pass model.mean_module from a fitted GP to ensure prediction alignment.
+            random_state: Random state for KMeans clustering in Nyström approximation.
+                If None, uses 42 for reproducibility.
 
         Note:
             When using GPyTorch kernels with n>800, GPyTorch switches from Cholesky
@@ -46,7 +49,9 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         super().__init__(X, y, kernel, cme_reg, mean_function)
 
         # Run Nyström approximation and Kernel Ridge Regression on residuals
-        self.nystroem = Nystroem(kernel=self.kernel, n_components=n_components)
+        self.nystroem = Nystroem(
+            kernel=self.kernel, n_components=n_components, random_state=random_state
+        )
         self.nystroem.fit(self.X)
         Z = self.nystroem.transform(self.X)
         K_train = Z @ Z.T

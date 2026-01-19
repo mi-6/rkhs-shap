@@ -170,5 +170,54 @@ def test_approx_rkhs_shap_diabetes_scaled(trained_model_scaled):
     run_rkhs_shap_test(trained_model_scaled, min_corr_O=0.75)
 
 
+def test_approx_rkhs_shap_reproducibility():
+    """Test that approximate RKHS-SHAP produces reproducible results."""
+    np.random.seed(456)
+    torch.manual_seed(456)
+
+    n_train, n_features, n_explain = 10, 10, 3
+    X_train = torch.randn(n_train, n_features, dtype=torch.float64)
+    true_weights = torch.randn(n_features, dtype=torch.float64) * 0.5
+    y_train = X_train @ true_weights + 0.1 * torch.randn(n_train, dtype=torch.float64)
+
+    kernel = gpytorch.kernels.RBFKernel(ard_num_dims=n_features)
+    kernel.lengthscale = torch.ones(1, n_features) * 2.0
+    gp, X_train, y_train = train_gp_model(
+        X_train, y_train, covar_module=kernel, training_iter=5
+    )
+    X_explain = X_train[:n_explain]
+
+    def create_model(random_state=42):
+        return RKHSSHAPApprox(
+            X=X_train,
+            y=y_train,
+            kernel=gp.covar_module,
+            noise_var=gp.likelihood.noise.item(),
+            n_components=5,
+            mean_function=gp.mean_module,
+            random_state=random_state,
+        )
+
+    # Test 1: Default random_state produces identical results
+    shap_1 = create_model().fit(X_explain, "I", "weighted", num_samples=100)
+    shap_2 = create_model().fit(X_explain, "I", "weighted", num_samples=100)
+    np.testing.assert_array_equal(shap_1, shap_2)
+
+    # Test 2: Same random_state + same RNG produces identical results
+    rng1, rng2 = np.random.default_rng(888), np.random.default_rng(888)
+    shap_3 = create_model(777).fit(
+        X_explain, "I", "weighted", num_samples=100, rng=rng1
+    )
+    shap_4 = create_model(777).fit(
+        X_explain, "I", "weighted", num_samples=100, rng=rng2
+    )
+    np.testing.assert_array_equal(shap_3, shap_4)
+
+    # Test 3: Different random_states produce different SHAP values
+    shap_5 = create_model(111).fit(X_explain, "I", "weighted", num_samples=100)
+    shap_6 = create_model(222).fit(X_explain, "I", "weighted", num_samples=100)
+    assert not np.allclose(shap_5, shap_6, rtol=1e-5)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
