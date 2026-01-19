@@ -40,5 +40,35 @@ def test_sample_coalitions_weighted(m, n_samples):
     assert len(unique_rows) == n_unique
 
 
+@pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100)])
+def test_sample_coalitions_weighted_reproducibility_default(m, n_samples):
+    """Test that passing explicit RNG produces identical results."""
+    rng1 = np.random.default_rng(42)
+    rng2 = np.random.default_rng(42)
+    Z1 = sample_coalitions_weighted(m, n_samples, rng=rng1)
+    Z2 = sample_coalitions_weighted(m, n_samples, rng=rng2)
+    np.testing.assert_array_equal(Z1, Z2)
+
+
+@pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100)])
+def test_sample_coalitions_weighted_reproducibility_with_rng(m, n_samples):
+    """Test that passing same seed produces identical results."""
+    rng1 = np.random.default_rng(123)
+    rng2 = np.random.default_rng(123)
+    Z1 = sample_coalitions_weighted(m, n_samples, rng=rng1)
+    Z2 = sample_coalitions_weighted(m, n_samples, rng=rng2)
+    np.testing.assert_array_equal(Z1, Z2)
+
+
+@pytest.mark.parametrize("m,n_samples", [(5, 50), (10, 100)])
+def test_sample_coalitions_weighted_different_seeds(m, n_samples):
+    """Test that different seeds produce different results."""
+    rng1 = np.random.default_rng(123)
+    rng2 = np.random.default_rng(456)
+    Z1 = sample_coalitions_weighted(m, n_samples, rng=rng1)
+    Z2 = sample_coalitions_weighted(m, n_samples, rng=rng2)
+    assert not np.array_equal(Z1, Z2)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

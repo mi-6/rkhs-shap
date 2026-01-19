@@ -290,5 +290,51 @@ def test_exact_rkhs_shap_mc_sampling():
     print("=" * 60)
 
 
+def test_exact_rkhs_shap_reproducibility():
+    """Test that exact RKHS-SHAP produces reproducible results with MC sampling."""
+    np.random.seed(123)
+    torch.manual_seed(123)
+
+    n_train, n_features, n_explain = 10, 10, 3
+    X_train = torch.randn(n_train, n_features, dtype=torch.float64)
+    true_weights = torch.randn(n_features, dtype=torch.float64) * 0.5
+    y_train = X_train @ true_weights + 0.1 * torch.randn(n_train, dtype=torch.float64)
+
+    kernel = gpytorch.kernels.RBFKernel(ard_num_dims=n_features)
+    kernel.lengthscale = torch.ones(1, n_features) * 2.0
+    gp, X_train, y_train = train_gp_model(
+        X_train, y_train, covar_module=kernel, training_iter=5
+    )
+    X_explain = X_train[:n_explain]
+
+    rkhs_shap = RKHSSHAP(
+        X=X_train,
+        y=y_train,
+        kernel=gp.covar_module,
+        noise_var=gp.likelihood.noise.item(),
+        cme_reg=CME_REGULARIZATION,
+        mean_function=gp.mean_module,
+    )
+
+    # Test 1: Explicit RNG produces identical results
+    rng1 = np.random.default_rng(42)
+    rng2 = np.random.default_rng(42)
+    shap_1 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100, rng=rng1)
+    shap_2 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100, rng=rng2)
+    np.testing.assert_array_equal(shap_1, shap_2)
+
+    # Test 2: Passing same RNG produces identical results
+    rng1, rng2 = np.random.default_rng(999), np.random.default_rng(999)
+    shap_3 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100, rng=rng1)
+    shap_4 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100, rng=rng2)
+    np.testing.assert_array_equal(shap_3, shap_4)
+
+    # Test 3: Different seeds produce different results
+    rng_a, rng_b = np.random.default_rng(111), np.random.default_rng(222)
+    shap_5 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100, rng=rng_a)
+    shap_6 = rkhs_shap.fit(X_explain, "I", "weighted", num_samples=100, rng=rng_b)
+    assert not np.array_equal(shap_5, shap_6)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
