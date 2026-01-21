@@ -48,27 +48,29 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         super().__init__(X, y, kernel, cme_reg, mean_function)
 
         # Run Nyström approximation and Kernel Ridge Regression on residuals
-        self.nystroem = Nystroem(kernel=self.kernel, n_components=n_components, rng=rng)
-        self.nystroem.fit(self.X)
-        Z = self.nystroem.transform(self.X)
+        self._nystroem = Nystroem(
+            kernel=self._kernel, n_components=n_components, rng=rng
+        )
+        self._nystroem.fit(self._X)
+        Z = self._nystroem.transform(self._X)
         K_train = Z @ Z.T
         n = K_train.shape[0]
 
-        mean_train = self._eval_mean(self.X)
-        y_centered = (self.y - mean_train).reshape(-1, 1)
+        mean_train = self._eval_mean(self._X)
+        y_centered = (self._y - mean_train).reshape(-1, 1)
 
         jitter = 1e-8
         K_reg = K_train + (noise_var + jitter) * torch.eye(n, dtype=K_train.dtype)
 
         krr_weights: Tensor = torch.linalg.solve(K_reg, y_centered)
 
-        self.krr_weights = krr_weights.reshape(-1, 1)
-        self.ypred = K_train @ krr_weights + mean_train.reshape(-1, 1)
-        self.rmse = torch.sqrt(
-            torch.mean((self.ypred - self.y.reshape(-1, 1)) ** 2)
+        self._krr_weights = krr_weights.reshape(-1, 1)
+        self._ypred = K_train @ krr_weights + mean_train.reshape(-1, 1)
+        self._rmse = torch.sqrt(
+            torch.mean((self._ypred - self._y.reshape(-1, 1)) ** 2)
         ).item()
-        self.reference = self.ypred.mean().item()
-        self.Z = Z
+        self._reference = self._ypred.mean().item()
+        self._Z = Z
 
     def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
@@ -88,7 +90,7 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         if coalition_size == 0:
             return torch.zeros(1, X_test.shape[0])
 
-        if coalition_size == self.m:
+        if coalition_size == self._m:
             return self._compute_full_prediction(X_test)
 
         # Naming conventions:
@@ -99,18 +101,18 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
         # Transform using Nyström with subsetted data
-        Z_S = self._nystroem_transform_subset(self.X, S_kernel)
+        Z_S = self._nystroem_transform_subset(self._X, S_kernel)
         Z_S_new = self._nystroem_transform_subset(X_test, S_kernel)
         K_SSp = Z_S @ Z_S_new.T
 
-        Z_Sc = self._nystroem_transform_subset(self.X, Sc_kernel)
+        Z_Sc = self._nystroem_transform_subset(self._X, Sc_kernel)
         K_Sc = Z_Sc @ Z_Sc.T
         KME_vec = K_Sc.mean(dim=1, keepdim=True)
 
-        ypred_partial = self.krr_weights.T @ (K_SSp * KME_vec) + self._eval_mean(
+        ypred_partial = self._krr_weights.T @ (K_SSp * KME_vec) + self._eval_mean(
             X_test
         ).unsqueeze(0)
-        return ypred_partial - self.reference
+        return ypred_partial - self._reference
 
     def _nystroem_transform_subset(
         self, X: Tensor, subset_kernel: SubsetKernel
@@ -123,10 +125,10 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         # Apply Nyström transformation with subset kernel
         # SubsetKernel will internally select the active dimensions
         ZT = (
-            subset_kernel(self.nystroem.landmarks)
+            subset_kernel(self._nystroem._landmarks)
             .add_jitter()
             .cholesky()
-            .solve(subset_kernel(self.nystroem.landmarks, X).to_dense())
+            .solve(subset_kernel(self._nystroem._landmarks, X).to_dense())
         )
         return ZT.T
 
@@ -139,10 +141,10 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         Returns:
             Prediction minus reference, shape (1, n_test)
         """
-        ypred_test = self.krr_weights.T @ self.Z @ self.nystroem.transform(
+        ypred_test = self._krr_weights.T @ self._Z @ self._nystroem.transform(
             X_test
         ).T + self._eval_mean(X_test).unsqueeze(0)
-        return ypred_test - self.reference
+        return ypred_test - self._reference
 
     def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute observational Shapley value function for coalition z.
@@ -162,16 +164,16 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         if coalition_size == 0:
             return torch.zeros(1, X_test.shape[0])
 
-        if coalition_size == self.m:
+        if coalition_size == self._m:
             return self._compute_full_prediction(X_test)
 
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
-        Z_S = self._nystroem_transform_subset(self.X, S_kernel)
+        Z_S = self._nystroem_transform_subset(self._X, S_kernel)
         Z_S_new = self._nystroem_transform_subset(X_test, S_kernel)
         K_SSp = Z_S @ Z_S_new.T
 
-        Z_Sc = self._nystroem_transform_subset(self.X, Sc_kernel)
+        Z_Sc = self._nystroem_transform_subset(self._X, Sc_kernel)
         K_Sc = Z_Sc @ Z_Sc.T
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
@@ -179,11 +181,11 @@ class RKHSSHAPApprox(RKHSSHAPBase):
         n_comp = ZS_gram.shape[0]
         jitter = 1e-8
         Xi_S = torch.linalg.solve(
-            ZS_gram + (self.cme_reg + jitter) * torch.eye(n_comp, dtype=ZS_gram.dtype),
+            ZS_gram + (self._cme_reg + jitter) * torch.eye(n_comp, dtype=ZS_gram.dtype),
             Z_S_new.T,
         )
 
-        ypred_partial = self.krr_weights.T @ (
+        ypred_partial = self._krr_weights.T @ (
             K_SSp * (K_Sc @ Z_S @ Xi_S)
         ) + self._eval_mean(X_test).unsqueeze(0)
-        return ypred_partial - self.reference
+        return ypred_partial - self._reference

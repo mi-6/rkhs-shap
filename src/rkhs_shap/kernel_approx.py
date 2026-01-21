@@ -23,10 +23,10 @@ class Nystroem:
             n_components: Number of landmark points for approximation
             rng: Optional numpy random generator. If None, uses non-deterministic randomness.
         """
-        self.kernel = kernel
-        self.n_components = n_components
-        self.rng = rng
-        self.landmarks = None
+        self._kernel = kernel
+        self._n_components = n_components
+        self._rng = rng
+        self._landmarks = None
 
     def fit(self, X: Tensor) -> None:
         """Fit landmark points using KMeans clustering.
@@ -35,10 +35,10 @@ class Nystroem:
             X: Training data of shape (n, m)
         """
         X_tensor = to_tensor(X)
-        random_state = None if self.rng is None else self.rng.integers(0, 2**31 - 1)
-        km = KMeans(n_clusters=self.n_components, random_state=random_state)
+        random_state = None if self._rng is None else self._rng.integers(0, 2**31 - 1)
+        km = KMeans(n_clusters=self._n_components, random_state=random_state)
         km.fit(X_tensor.cpu().numpy())
-        self.landmarks = to_tensor(km.cluster_centers_)
+        self._landmarks = to_tensor(km.cluster_centers_)
 
     def transform(self, X: Tensor) -> Tensor:
         """Transform data using Nyström approximation.
@@ -49,17 +49,17 @@ class Nystroem:
         Returns:
             Transformed features of shape (n, n_components)
         """
-        if self.landmarks is None:
+        if self._landmarks is None:
             raise ValueError("Must call fit() before transform()")
 
         X_tensor = to_tensor(X)
 
         # Compute K_mm^{-1/2} @ K_mn
         ZT = (
-            self.kernel(self.landmarks)
+            self._kernel(self._landmarks)
             .add_jitter()
             .cholesky()
-            .solve(self.kernel(self.landmarks, X_tensor).to_dense())
+            .solve(self._kernel(self._landmarks, X_tensor).to_dense())
         )
 
         return ZT.T

@@ -47,14 +47,14 @@ class ShapleyRegulariser(object):
             n_components (int): [number of landmark points for kernel approximation]
         """
 
-        self.lambda_cme = lambda_cme
-        self.lambda_krr = lambda_krr
-        self.lambda_sv = lambda_sv
-        self.n_components = n_components
+        self._lambda_cme = lambda_cme
+        self._lambda_krr = lambda_krr
+        self._lambda_sv = lambda_sv
+        self._n_components = n_components
 
-        self.Z = None
-        self.nystroem = None
-        self.kernel = None
+        self._Z = None
+        self._nystroem = None
+        self._kernel = None
 
     def _get_int_embedding(self, z, X):
         """
@@ -65,15 +65,15 @@ class ShapleyRegulariser(object):
         n, m = X.shape
 
         if z.sum() == m:
-            return self.Z @ self.Z.T
+            return self._Z @ self._Z.T
         elif z.sum() == 0:
-            return (self.Kx.mean(axis=1) * torch.ones((n, n))).T
+            return (self._Kx.mean(axis=1) * torch.ones((n, n))).T
         else:
             S = np.where(z)[0]
             Sc = np.where(zc)[0]
 
-            S_kernel = SubsetKernel(self.kernel, subset_dims=S)
-            Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+            S_kernel = SubsetKernel(self._kernel, subset_dims=S)
+            Sc_kernel = SubsetKernel(self._kernel, subset_dims=Sc)
 
             Z_S = self._nystroem_transform_subset(X, S_kernel)
             K_SS = Z_S @ Z_S.T
@@ -94,15 +94,15 @@ class ShapleyRegulariser(object):
         n = X.shape[0]
 
         if z.sum() == 0:
-            return self.Kx
+            return self._Kx
         elif z.sum() == 0:
-            return self.Kx.mean(axis=1) * torch.ones((n, n)).T
+            return self._Kx.mean(axis=1) * torch.ones((n, n)).T
         else:
             S = np.where(z)[0]
             Sc = np.where(zc)[0]
 
-            S_kernel = SubsetKernel(self.kernel, subset_dims=S)
-            Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+            S_kernel = SubsetKernel(self._kernel, subset_dims=S)
+            Sc_kernel = SubsetKernel(self._kernel, subset_dims=Sc)
 
             Z_S = self._nystroem_transform_subset(X, S_kernel)
             K_SS = Z_S @ Z_S.T
@@ -110,7 +110,7 @@ class ShapleyRegulariser(object):
             Z_Sc = self._nystroem_transform_subset(X, Sc_kernel)
             cme_latter_part = (
                 to_linear_operator(Z_S.T @ Z_S)
-                .add_diagonal(to_tensor(self.lambda_cme))
+                .add_diagonal(to_tensor(self._lambda_cme))
                 .solve(Z_S.T)
             )
             holder = K_SS * (Z_Sc @ Z_Sc.T @ Z_S @ cme_latter_part)
@@ -122,10 +122,10 @@ class ShapleyRegulariser(object):
         X_tensor = to_tensor(X)
 
         ZT = (
-            subset_kernel(self.nystroem.landmarks)
+            subset_kernel(self._nystroem._landmarks)
             .add_jitter()
             .cholesky()
-            .solve(subset_kernel(self.nystroem.landmarks, X_tensor).to_dense())
+            .solve(subset_kernel(self._nystroem._landmarks, X_tensor).to_dense())
         )
         return ZT.T
 
@@ -151,30 +151,30 @@ class ShapleyRegulariser(object):
             sample_method (str, optional): [sampling method to compute shapley functionals]. Defaults to "weighted".
         """
 
-        self.X = X
-        self.n, self.m = X.shape
-        self.ls = ls
+        self._X = X
+        self._n, self._m = X.shape
+        self._ls = ls
 
         rbf = RBFKernel()
         rbf.lengthscale = to_tensor(ls)
         rbf.raw_lengthscale.requires_grad = False
-        self.kernel = rbf
+        self._kernel = rbf
 
-        ny = Nystroem(kernel=rbf, n_components=self.n_components)
-        ny.fit(to_tensor(self.X))
-        Phi = ny.transform(to_tensor(self.X))
-        self.Z = Phi
+        ny = Nystroem(kernel=rbf, n_components=self._n_components)
+        ny.fit(to_tensor(self._X))
+        Phi = ny.transform(to_tensor(self._X))
+        self._Z = Phi
         Kx = Phi @ Phi.T
 
-        self.nystroem = ny
-        self.Kx = Kx
+        self._nystroem = ny
+        self._Kx = Kx
 
-        m_exclude_i = self.m - len(features_index)
+        m_exclude_i = self._m - len(features_index)
         if sample_method == "weighted":
             Z_exclude_i = sample_coalitions_weighted(m_exclude_i, num_samples)
         else:
             Z_exclude_i = sample_coalitions_full(m_exclude_i)
-        A = np.zeros((self.n, self.n))
+        A = np.zeros((self._n, self._n))
 
         for row in tqdm(Z_exclude_i):
             Sui, S = insert_i(row, feature_to_exclude=features_index)
@@ -198,30 +198,30 @@ class ShapleyRegulariser(object):
 
         A = A / Z_exclude_i.shape[0]
 
-        self.A = A
+        self._A = A
 
         # Formulate the regression
         y_ten = to_tensor(y).reshape(-1, 1)
         A = to_linear_operator(to_tensor(A))
-        self.AAt = A @ A.t()
+        self._AAt = A @ A.t()
         K = rbf(to_tensor(X / ls))
         alphas = (
-            (K @ K + self.lambda_krr * K + self.lambda_sv * self.AAt)
+            (K @ K + self._lambda_krr * K + self._lambda_sv * self._AAt)
             .add_jitter()
             .solve(K.matmul(y_ten))
         )
 
-        self.alphas = alphas
+        self._alphas = alphas
         ypred = K.matmul(alphas)
 
         print("RMSE: %.2f" % torch.sqrt(torch.mean((y_ten - ypred) ** 2)))
 
-        self.RMSE = torch.sqrt(torch.mean((y_ten - ypred) ** 2)).numpy()
-        self.ypred = ypred
+        self._RMSE = torch.sqrt(torch.mean((y_ten - ypred) ** 2)).numpy()
+        self._ypred = ypred
 
     def predict(self, X_test):
         # obtain kernel K_{test, train} first
-        Z_test = self.nystroem.transform(to_tensor(X_test))
-        K_xpx = Z_test @ self.Z.T
+        Z_test = self._nystroem.transform(to_tensor(X_test))
+        K_xpx = Z_test @ self._Z.T
 
-        return K_xpx @ self.alphas
+        return K_xpx @ self._alphas

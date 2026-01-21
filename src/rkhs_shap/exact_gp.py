@@ -71,10 +71,6 @@ class ExactGPModel(gpytorch.models.ExactGP):
         self.eval()
         self.likelihood.eval()
 
-    @property
-    def lengthscale(self) -> torch.Tensor:
-        return self.covar_module.lengthscale
-
 
 if __name__ == "__main__":
     import shap
