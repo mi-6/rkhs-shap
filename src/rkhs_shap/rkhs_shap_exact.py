@@ -67,21 +67,21 @@ class RKHSSHAP(RKHSSHAPBase):
         super().__init__(X, y, kernel, cme_reg, mean_function)
 
         # Run Kernel Ridge Regression on residuals (y - mean(X))
-        K_train = self.kernel(self.X).to_dense()
-        mean_train = self._eval_mean(self.X)
-        y_centered = self.y - mean_train
+        K_train = self._kernel(self._X).to_dense()
+        mean_train = self._eval_mean(self._X)
+        y_centered = self._y - mean_train
 
         jitter = 1e-8
-        self.eye_n = torch.eye(self.n, dtype=self.X.dtype)
-        K_reg = K_train + (noise_var + jitter) * self.eye_n
+        self._eye_n = torch.eye(self._n, dtype=self._X.dtype)
+        K_reg = K_train + (noise_var + jitter) * self._eye_n
 
         krr_weights: Tensor = torch.linalg.solve(K_reg, y_centered)
-        self.krr_weights = krr_weights.reshape(-1, 1)
+        self._krr_weights = krr_weights.reshape(-1, 1)
 
         # Predictions include mean function
-        self.ypred = K_train @ krr_weights + mean_train
-        self.rmse = torch.sqrt(torch.mean((self.ypred - self.y) ** 2)).item()
-        self.reference = self.ypred.mean().item()
+        self._ypred = K_train @ krr_weights + mean_train
+        self._rmse = torch.sqrt(torch.mean((self._ypred - self._y) ** 2)).item()
+        self._reference = self._ypred.mean().item()
 
     def _compute_full_prediction(self, X_test: Tensor) -> Tensor:
         """Compute full prediction for all features active (z.sum() == m).
@@ -92,9 +92,9 @@ class RKHSSHAP(RKHSSHAPBase):
         Returns:
             Prediction minus reference, shape (1, n_test)
         """
-        K_test = self.kernel(self.X, X_test).to_dense()
-        ypred_test = self.krr_weights.T @ K_test + self._eval_mean(X_test).unsqueeze(0)
-        return ypred_test - self.reference
+        K_test = self._kernel(self._X, X_test).to_dense()
+        ypred_test = self._krr_weights.T @ K_test + self._eval_mean(X_test).unsqueeze(0)
+        return ypred_test - self._reference
 
     def _value_intervention(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute interventional Shapley value function for coalition z.
@@ -112,7 +112,7 @@ class RKHSSHAP(RKHSSHAPBase):
         if z.sum() == 0:
             return torch.zeros(1, X_test.shape[0])
 
-        if z.sum() == self.m:
+        if z.sum() == self._m:
             return self._compute_full_prediction(X_test)
 
         # Naming conventions:
@@ -122,14 +122,14 @@ class RKHSSHAP(RKHSSHAPBase):
         # Sc (S complement) is the complement set - features NOT in S
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
-        K_SSp = S_kernel(self.X, X_test).to_dense()
-        K_Sc = Sc_kernel(self.X, self.X).to_dense()
+        K_SSp = S_kernel(self._X, X_test).to_dense()
+        K_Sc = Sc_kernel(self._X, self._X).to_dense()
         KME_vec = K_Sc.mean(dim=1, keepdim=True)
 
-        ypred_partial = self.krr_weights.T @ (K_SSp * KME_vec) + self._eval_mean(
+        ypred_partial = self._krr_weights.T @ (K_SSp * KME_vec) + self._eval_mean(
             X_test
         ).unsqueeze(0)
-        return ypred_partial - self.reference
+        return ypred_partial - self._reference
 
     def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
         """Compute observational Shapley value function for coalition z.
@@ -147,22 +147,22 @@ class RKHSSHAP(RKHSSHAPBase):
         if z.sum() == 0:
             return torch.zeros(1, X_test.shape[0])
 
-        if z.sum() == self.m:
+        if z.sum() == self._m:
             return self._compute_full_prediction(X_test)
 
         S_kernel, Sc_kernel = self._get_subset_kernels(z)
 
-        K_SSp = S_kernel(self.X, X_test).to_dense()
-        K_Sc = Sc_kernel(self.X, self.X).to_dense()
-        K_SS = S_kernel(self.X, self.X).to_dense()
+        K_SSp = S_kernel(self._X, X_test).to_dense()
+        K_Sc = Sc_kernel(self._X, self._X).to_dense()
+        K_SS = S_kernel(self._X, self._X).to_dense()
 
         # Conditional Mean Embedding operator: maps complement features to coalition features
         jitter = 1e-8
         Xi_S = torch.linalg.solve(
-            K_SS + (self.n * self.cme_reg + jitter) * self.eye_n, K_Sc
+            K_SS + (self._n * self._cme_reg + jitter) * self._eye_n, K_Sc
         ).T
 
-        ypred_partial = self.krr_weights.T @ (K_SSp * (Xi_S @ K_SSp)) + self._eval_mean(
-            X_test
-        ).unsqueeze(0)
-        return ypred_partial - self.reference
+        ypred_partial = self._krr_weights.T @ (
+            K_SSp * (Xi_S @ K_SSp)
+        ) + self._eval_mean(X_test).unsqueeze(0)
+        return ypred_partial - self._reference

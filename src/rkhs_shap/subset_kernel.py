@@ -29,7 +29,7 @@ class SubsetKernel(Kernel):
         >>> K = subset_kernel(x, x)  # Only uses columns [0, 2, 5]
     """
 
-    subset_dims: Tensor
+    _subset_dims: Tensor
 
     def __init__(
         self,
@@ -42,11 +42,11 @@ class SubsetKernel(Kernel):
                 "SubsetKernel does not support base kernels with active_dims set."
             )
 
-        self.base_kernel = deepcopy(base_kernel)
+        self._base_kernel = deepcopy(base_kernel)
         self.register_buffer(
-            "subset_dims", torch.as_tensor(subset_dims, dtype=torch.int)
+            "_subset_dims", torch.as_tensor(subset_dims, dtype=torch.int)
         )
-        self._subset_kernel_params(self.base_kernel)
+        self._subset_kernel_params(self._base_kernel)
 
     def _subset_kernel_params(self, kernel: Kernel) -> None:
         """
@@ -61,11 +61,11 @@ class SubsetKernel(Kernel):
             return
 
         if kernel.ard_num_dims is not None:
-            kernel.ard_num_dims = len(self.subset_dims)
+            kernel.ard_num_dims = len(self._subset_dims)
 
         if kernel.has_lengthscale:
             kernel.raw_lengthscale.data = kernel.raw_lengthscale.data[
-                ..., self.subset_dims
+                ..., self._subset_dims
             ]
 
         self._recurse_nested_kernels(kernel)
@@ -76,7 +76,9 @@ class SubsetKernel(Kernel):
             return False
 
         lengthscale = kernel.lengthscale
-        return lengthscale.numel() > 1 and lengthscale.shape[-1] > len(self.subset_dims)
+        return lengthscale.numel() > 1 and lengthscale.shape[-1] > len(
+            self._subset_dims
+        )
 
     def _recurse_nested_kernels(self, kernel: Kernel) -> None:
         """Recursively process nested kernel structures."""
@@ -107,9 +109,9 @@ class SubsetKernel(Kernel):
         Returns:
             Kernel matrix of shape (..., n, m) or (..., n) if diag=True
         """
-        x1 = x1[..., self.subset_dims]
-        x2 = x2[..., self.subset_dims]
+        x1 = x1[..., self._subset_dims]
+        x2 = x2[..., self._subset_dims]
 
-        return self.base_kernel(
+        return self._base_kernel(
             x1, x2, diag=diag, last_dim_is_batch=last_dim_is_batch, **params
         )

@@ -54,17 +54,17 @@ def weighted_ridge(
 class RKHSSHAPBase(ABC):
     """Base class with shared fit method for RKHS-SHAP implementations"""
 
-    n: int
-    m: int
-    X: Tensor
-    y: Tensor
-    cme_reg: Tensor
-    mean_function: Callable[[Tensor], Tensor]
-    kernel: Kernel
-    krr_weights: Tensor
-    ypred: Tensor
-    rmse: float
-    reference: float
+    _n: int
+    _m: int
+    _X: Tensor
+    _y: Tensor
+    _cme_reg: Tensor
+    _mean_function: Callable[[Tensor], Tensor]
+    _kernel: Kernel
+    _krr_weights: Tensor
+    _ypred: Tensor
+    _rmse: float
+    _reference: float
 
     def __init__(
         self,
@@ -84,14 +84,14 @@ class RKHSSHAPBase(ABC):
             mean_function: Optional mean function m(x). If provided, KRR will fit
                 residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
         """
-        self.n, self.m = X.shape
-        self.X, self.y = X.double(), y.double()
-        self.cme_reg = to_tensor(cme_reg)
-        self.mean_function = (
+        self._n, self._m = X.shape
+        self._X, self._y = X.double(), y.double()
+        self._cme_reg = to_tensor(cme_reg)
+        self._mean_function = (
             mean_function if mean_function else lambda x: torch.zeros(x.shape[0])
         )
-        self.kernel = deepcopy(kernel)
-        freeze_parameters(self.kernel)
+        self._kernel = deepcopy(kernel)
+        freeze_parameters(self._kernel)
 
     @abstractmethod
     def _value_observation(self, z: np.ndarray, X_test: Tensor) -> Tensor:
@@ -122,7 +122,7 @@ class RKHSSHAPBase(ABC):
     def _eval_mean(self, X: Tensor) -> Tensor:
         """Evaluate mean function with proper shape handling."""
         with torch.inference_mode():
-            mean = self.mean_function(X).detach()
+            mean = self._mean_function(X).detach()
         if mean.dim() == 0:
             mean = mean.expand(X.shape[0])
         return mean
@@ -138,8 +138,8 @@ class RKHSSHAPBase(ABC):
         """
         S = np.where(z)[0]
         Sc = np.where(~z)[0]
-        S_kernel = SubsetKernel(self.kernel, subset_dims=S)
-        Sc_kernel = SubsetKernel(self.kernel, subset_dims=Sc)
+        S_kernel = SubsetKernel(self._kernel, subset_dims=S)
+        Sc_kernel = SubsetKernel(self._kernel, subset_dims=Sc)
         return S_kernel, Sc_kernel
 
     def fit(
@@ -166,7 +166,7 @@ class RKHSSHAPBase(ABC):
         Returns:
             SHAP values of shape (n_test, m)
         """
-        m = self.m
+        m = self._m
         if sample_method == "weighted":
             Z = sample_coalitions_weighted(m, num_samples, rng=rng)
         elif sample_method == "full":

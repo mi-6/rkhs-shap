@@ -98,8 +98,8 @@ def run_rkhs_shap_test(
     model_preds = gp.predict(X_explain).mean
     baseline = gp.predict(X_train).mean.mean().item()
 
-    internal_preds = rkhs_shap.ypred[:N_EXPLAIN_SAMPLES].squeeze()
-    internal_baseline = rkhs_shap.reference
+    internal_preds = rkhs_shap._ypred[:N_EXPLAIN_SAMPLES].squeeze()
+    internal_baseline = rkhs_shap._reference
 
     additivity_mae_I = calculate_additivity_mae(shap_values_I, model_preds, baseline)
     additivity_mae_O = calculate_additivity_mae(shap_values_O, model_preds, baseline)

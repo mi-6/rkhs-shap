@@ -37,7 +37,7 @@ def test_subset_kernel_rbf():
     max_error = (kernel_expected - kernel_actual).abs().max().item()
     assert max_error < 1e-6, f"Error too large: {max_error}"
     assert kernel_actual.shape == (n_samples, n_samples)
-    scale_kernel = subset_kernel.base_kernel
+    scale_kernel = subset_kernel._base_kernel
     assert hasattr(scale_kernel, "base_kernel")
     inner_kernel = scale_kernel.base_kernel
     assert inner_kernel.lengthscale.shape[-1] == len(subset_dims)  # type: ignore[index]
@@ -52,7 +52,7 @@ def test_subset_kernel_deep_copy():
     base_kernel.lengthscale = to_tensor([10.0, 20.0, 30.0, 40.0, 50.0])
     # SubsetKernel should not be affected
     expected_lengthscales = to_tensor([1.0, 3.0, 5.0])
-    actual_lengthscales = subset_kernel.base_kernel.lengthscale.squeeze()
+    actual_lengthscales = subset_kernel._base_kernel.lengthscale.squeeze()
     assert torch.allclose(
         actual_lengthscales, expected_lengthscales.to(actual_lengthscales.dtype)
     )
@@ -119,7 +119,7 @@ def test_subset_kernel_with_matern_kernel():
 
     # Check that lengthscales were correctly subsetted
     expected_lengthscales = base_kernel.lengthscale.squeeze()[subset_dims]
-    actual_lengthscales = subset_kernel.base_kernel.lengthscale
+    actual_lengthscales = subset_kernel._base_kernel.lengthscale
     assert torch.allclose(actual_lengthscales, expected_lengthscales)
 
     # Check that diagonal is all ones (self-similarity)
