@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from gpytorch.kernels import Kernel
 from torch import Tensor
+from tqdm import tqdm
 
 from rkhs_shap.sampling import (
     compute_kernelshap_weights,
@@ -187,7 +188,7 @@ class RKHSSHAPBase(ABC):
         else:
             raise ValueError("Must be either interventional or observational")
 
-        for idx, row in enumerate(Z):
+        for idx, row in enumerate(tqdm(Z)):
             Y_target[idx, :] = value_fn(row, X_test)
 
         Z = torch.from_numpy(Z)

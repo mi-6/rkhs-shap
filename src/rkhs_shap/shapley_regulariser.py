@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from gpytorch.kernels import RBFKernel
 from linear_operator.operators import to_linear_operator
+from tqdm import tqdm
 
 from rkhs_shap.kernel_approx import Nystroem
 from rkhs_shap.sampling import (
@@ -175,7 +176,7 @@ class ShapleyRegulariser(object):
             Z_exclude_i = sample_coalitions_full(m_exclude_i)
         A = np.zeros((self._n, self._n))
 
-        for row in Z_exclude_i:
+        for row in tqdm(Z_exclude_i):
             Sui, S = insert_i(row, feature_to_exclude=features_index)
 
             if method == "O":
