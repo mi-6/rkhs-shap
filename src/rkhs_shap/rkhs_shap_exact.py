@@ -40,6 +40,7 @@ class RKHSSHAP(RKHSSHAPBase):
         noise_var: float = 1e-2,
         cme_reg: float = 1e-4,
         mean_function: Callable[[Tensor], Tensor] | None = None,
+        krr_weights: Tensor | None = None,
     ) -> None:
         """Initialize exact RKHS-SHAP with Kernel Ridge Regression.
 
@@ -52,12 +53,18 @@ class RKHSSHAP(RKHSSHAPBase):
             noise_var: KRR regularization parameter. Corresponds to the noise variance
                 in Gaussian Process formulation. If you've fit a GP model, use
                 model.likelihood.noise.item() for equivalent predictions. Values
-                above 0.3 suggest the GP may be poorly fitted.
+                above 0.3 suggest the GP may be poorly fitted. Ignored if krr_weights
+                is provided.
             cme_reg: Regularization for conditional/marginal mean embeddings.
                 Only used in observational value function.
             mean_function: Optional mean function m(x). If provided, KRR will fit
                 residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
                 Pass model.mean_module from a fitted GP to ensure prediction alignment.
+            krr_weights: Optional pre-computed KRR weights (alpha) of shape (n,) or
+                (n, 1). If provided, skips the expensive linear solve. Use this when
+                you have already trained a GP model and want to reuse the alpha
+                weights. For GPyTorch models, alpha can be extracted from
+                model.prediction_strategy.mean_cache after making a prediction.
 
         Note:
             When using GPyTorch kernels with n>800, GPyTorch switches from Cholesky
@@ -66,20 +73,22 @@ class RKHSSHAP(RKHSSHAPBase):
         """
         super().__init__(X, y, kernel, cme_reg, mean_function)
 
-        # Run Kernel Ridge Regression on residuals (y - mean(X))
         K_train = self._kernel(self._X).to_dense()
         mean_train = self._eval_mean(self._X)
-        y_centered = self._y - mean_train
-
-        jitter = 1e-8
         self._eye_n = torch.eye(self._n, dtype=self._X.dtype)
-        K_reg = K_train + (noise_var + jitter) * self._eye_n
 
-        krr_weights: Tensor = torch.linalg.solve(K_reg, y_centered)
-        self._krr_weights = krr_weights.reshape(-1, 1)
+        if krr_weights is not None:
+            self._krr_weights = krr_weights.reshape(-1, 1)
+        else:
+            # Run Kernel Ridge Regression on residuals (y - mean(X))
+            y_centered = self._y - mean_train
+            jitter = 1e-8
+            K_reg = K_train + (noise_var + jitter) * self._eye_n
+            weights: Tensor = torch.linalg.solve(K_reg, y_centered)
+            self._krr_weights = weights.reshape(-1, 1)
 
         # Predictions include mean function
-        self._ypred = K_train @ krr_weights + mean_train
+        self._ypred = K_train @ self._krr_weights.squeeze() + mean_train
         self._rmse = torch.sqrt(torch.mean((self._ypred - self._y) ** 2)).item()
         self._reference = self._ypred.mean().item()
 
