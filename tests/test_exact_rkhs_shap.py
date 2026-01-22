@@ -331,35 +331,57 @@ def test_exact_rkhs_shap_precomputed_weights(trained_model):
     X_explain = X_train[:N_EXPLAIN_SAMPLES]
 
     # Compute SHAP values from both
-    shap_baseline_I = rkhs_shap_baseline.fit(X_explain, method="I", sample_method="full")
-    shap_optimized_I = rkhs_shap_optimized.fit(X_explain, method="I", sample_method="full")
+    shap_baseline_I = rkhs_shap_baseline.fit(
+        X_explain, method="I", sample_method="full"
+    )
+    shap_optimized_I = rkhs_shap_optimized.fit(
+        X_explain, method="I", sample_method="full"
+    )
 
-    shap_baseline_O = rkhs_shap_baseline.fit(X_explain, method="O", sample_method="full")
-    shap_optimized_O = rkhs_shap_optimized.fit(X_explain, method="O", sample_method="full")
+    shap_baseline_O = rkhs_shap_baseline.fit(
+        X_explain, method="O", sample_method="full"
+    )
+    shap_optimized_O = rkhs_shap_optimized.fit(
+        X_explain, method="O", sample_method="full"
+    )
 
     # Verify they're identical
     np.testing.assert_allclose(
-        shap_baseline_I, shap_optimized_I, rtol=1e-10, atol=1e-10,
-        err_msg="Interventional SHAP values differ with pre-computed weights"
+        shap_baseline_I,
+        shap_optimized_I,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="Interventional SHAP values differ with pre-computed weights",
     )
     np.testing.assert_allclose(
-        shap_baseline_O, shap_optimized_O, rtol=1e-10, atol=1e-10,
-        err_msg="Observational SHAP values differ with pre-computed weights"
+        shap_baseline_O,
+        shap_optimized_O,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="Observational SHAP values differ with pre-computed weights",
     )
 
     # Also verify internal attributes match
     np.testing.assert_allclose(
-        rkhs_shap_baseline._reference, rkhs_shap_optimized._reference, rtol=1e-10,
-        err_msg="Reference values differ"
+        rkhs_shap_baseline._reference,
+        rkhs_shap_optimized._reference,
+        rtol=1e-10,
+        err_msg="Reference values differ",
     )
     np.testing.assert_allclose(
-        rkhs_shap_baseline._ypred.numpy(), rkhs_shap_optimized._ypred.numpy(), rtol=1e-10,
-        err_msg="Predictions differ"
+        rkhs_shap_baseline._ypred.numpy(),
+        rkhs_shap_optimized._ypred.numpy(),
+        rtol=1e-10,
+        err_msg="Predictions differ",
     )
 
     print("\nPre-computed weights test passed!")
-    print(f"Max diff (Interventional): {np.abs(shap_baseline_I - shap_optimized_I).max():.2e}")
-    print(f"Max diff (Observational): {np.abs(shap_baseline_O - shap_optimized_O).max():.2e}")
+    print(
+        f"Max diff (Interventional): {np.abs(shap_baseline_I - shap_optimized_I).max():.2e}"
+    )
+    print(
+        f"Max diff (Observational): {np.abs(shap_baseline_O - shap_optimized_O).max():.2e}"
+    )
 
 
 def test_exact_rkhs_shap_gpytorch_alpha(trained_model):
@@ -409,21 +431,25 @@ def test_exact_rkhs_shap_gpytorch_alpha(trained_model):
     X_explain = X_train[:N_EXPLAIN_SAMPLES]
 
     # Compute SHAP values from both
-    shap_baseline_I = rkhs_shap_baseline.fit(X_explain, method="I", sample_method="full")
+    shap_baseline_I = rkhs_shap_baseline.fit(
+        X_explain, method="I", sample_method="full"
+    )
     shap_gp_alpha_I = rkhs_shap_with_gp_alpha.fit(
         X_explain, method="I", sample_method="full"
     )
 
-    shap_baseline_O = rkhs_shap_baseline.fit(X_explain, method="O", sample_method="full")
+    shap_baseline_O = rkhs_shap_baseline.fit(
+        X_explain, method="O", sample_method="full"
+    )
     shap_gp_alpha_O = rkhs_shap_with_gp_alpha.fit(
         X_explain, method="O", sample_method="full"
     )
 
     # Check alpha values are very close (may have small numerical differences
     # due to different solve methods: GPyTorch uses CG for n>800, we use direct solve)
-    alpha_diff = torch.abs(
-        rkhs_shap_baseline._krr_weights.squeeze() - gp_alpha
-    ).max().item()
+    alpha_diff = (
+        torch.abs(rkhs_shap_baseline._krr_weights.squeeze() - gp_alpha).max().item()
+    )
     print(f"\nMax alpha difference (RKHSSHAP vs GPyTorch): {alpha_diff:.2e}")
 
     # SHAP values should be very close (allowing for small numerical differences)
@@ -436,12 +462,18 @@ def test_exact_rkhs_shap_gpytorch_alpha(trained_model):
     # Use tolerances that account for numerical differences in solve methods
     # GPyTorch may use different solvers (CG vs direct) which cause small differences
     np.testing.assert_allclose(
-        shap_baseline_I, shap_gp_alpha_I, rtol=1e-4, atol=2e-5,
-        err_msg="Interventional SHAP values differ too much with GPyTorch alpha"
+        shap_baseline_I,
+        shap_gp_alpha_I,
+        rtol=1e-4,
+        atol=2e-5,
+        err_msg="Interventional SHAP values differ too much with GPyTorch alpha",
     )
     np.testing.assert_allclose(
-        shap_baseline_O, shap_gp_alpha_O, rtol=1e-4, atol=2e-5,
-        err_msg="Observational SHAP values differ too much with GPyTorch alpha"
+        shap_baseline_O,
+        shap_gp_alpha_O,
+        rtol=1e-4,
+        atol=2e-5,
+        err_msg="Observational SHAP values differ too much with GPyTorch alpha",
     )
 
     # Verify correlation is nearly perfect
