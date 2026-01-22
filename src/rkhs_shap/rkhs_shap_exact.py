@@ -78,7 +78,7 @@ class RKHSSHAP(RKHSSHAPBase):
         self._eye_n = torch.eye(self._n, dtype=self._X.dtype)
 
         if krr_weights is not None:
-            self._krr_weights = krr_weights.reshape(-1, 1)
+            self._krr_weights = krr_weights.to(dtype=self._X.dtype).reshape(-1, 1)
         else:
             # Run Kernel Ridge Regression on residuals (y - mean(X))
             y_centered = self._y - mean_train
