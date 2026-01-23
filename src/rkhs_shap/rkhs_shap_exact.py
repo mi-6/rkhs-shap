@@ -37,7 +37,7 @@ class RKHSSHAP(RKHSSHAPBase):
         X: Tensor,
         y: Tensor,
         kernel: Kernel,
-        noise_var: float = 1e-2,
+        noise_var: float | None = None,
         cme_reg: float = 1e-4,
         mean_function: Callable[[Tensor], Tensor] | None = None,
         krr_weights: Tensor | None = None,
@@ -50,21 +50,25 @@ class RKHSSHAP(RKHSSHAPBase):
             kernel: Fitted kernel (e.g., RBFKernel, MaternKernel). The kernel's
                 lengthscale parameters significantly affect SHAP value accuracy.
                 Use a properly trained kernel for best results.
-            noise_var: KRR regularization parameter. Corresponds to the noise variance
-                in Gaussian Process formulation. If you've fit a GP model, use
+            noise_var: KRR regularization parameter. Required if krr_weights is not
+                provided. Corresponds to the noise variance in Gaussian Process
+                formulation. If you've fit a GP model, use
                 model.likelihood.noise.item() for equivalent predictions. Values
-                above 0.3 suggest the GP may be poorly fitted. Ignored if krr_weights
-                is provided.
+                above 0.3 suggest the GP may be poorly fitted.
             cme_reg: Regularization for conditional/marginal mean embeddings.
                 Only used in observational value function.
             mean_function: Optional mean function m(x). If provided, KRR will fit
                 residuals (y - m(X)) and predictions will be m(x) + k(x,X)α.
                 Pass model.mean_module from a fitted GP to ensure prediction alignment.
             krr_weights: Optional pre-computed KRR weights (alpha) of shape (n,) or
-                (n, 1). If provided, skips the expensive linear solve. Use this when
-                you have already trained a GP model and want to reuse the alpha
-                weights. For GPyTorch models, alpha can be extracted from
-                model.prediction_strategy.mean_cache after making a prediction.
+                (n, 1). If provided, skips the expensive linear solve and noise_var
+                is not required. Use this when you have already trained a GP model
+                and want to reuse the alpha weights. For GPyTorch models, alpha can
+                be extracted from model.prediction_strategy.mean_cache after making
+                a prediction.
+
+        Raises:
+            ValueError: If neither noise_var nor krr_weights is provided.
 
         Note:
             When using GPyTorch kernels with n>800, GPyTorch switches from Cholesky
@@ -72,6 +76,9 @@ class RKHSSHAP(RKHSSHAPBase):
             differences.
         """
         super().__init__(X, y, kernel, cme_reg, mean_function)
+
+        if krr_weights is None and noise_var is None:
+            raise ValueError("Must provide either noise_var or krr_weights")
 
         K_train = self._kernel(self._X).to_dense()
         mean_train = self._eval_mean(self._X)
@@ -81,6 +88,7 @@ class RKHSSHAP(RKHSSHAPBase):
             self._krr_weights = krr_weights.to(dtype=self._X.dtype).reshape(-1, 1)
         else:
             # Run Kernel Ridge Regression on residuals (y - mean(X))
+            assert noise_var is not None
             y_centered = self._y - mean_train
             jitter = 1e-8
             K_reg = K_train + (noise_var + jitter) * self._eye_n

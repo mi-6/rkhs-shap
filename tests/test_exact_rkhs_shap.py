@@ -384,6 +384,59 @@ def test_exact_rkhs_shap_precomputed_weights(trained_model):
     )
 
 
+def test_exact_rkhs_shap_requires_noise_var_or_krr_weights(trained_model):
+    """Test that ValueError is raised when neither noise_var nor krr_weights is provided."""
+    gp, X_train, y_train = trained_model
+
+    with pytest.raises(
+        ValueError, match="Must provide either noise_var or krr_weights"
+    ):
+        RKHSSHAP(
+            X=X_train,
+            y=y_train,
+            kernel=gp.covar_module,
+        )
+
+
+def test_exact_rkhs_shap_krr_weights_without_mean_function(trained_model):
+    """Test that krr_weights works correctly without a mean_function.
+
+    This verifies the common case where a simple kernel is used without
+    a GP mean module.
+    """
+    gp, X_train, y_train = trained_model
+
+    # Create baseline without mean_function
+    rkhs_shap_baseline = RKHSSHAP(
+        X=X_train,
+        y=y_train,
+        kernel=gp.covar_module,
+        noise_var=gp.likelihood.noise.item(),
+    )
+
+    # Use pre-computed weights without mean_function
+    rkhs_shap_with_weights = RKHSSHAP(
+        X=X_train,
+        y=y_train,
+        kernel=gp.covar_module,
+        krr_weights=rkhs_shap_baseline._krr_weights.clone(),
+    )
+
+    X_explain = X_train[:N_EXPLAIN_SAMPLES]
+
+    shap_baseline = rkhs_shap_baseline.fit(X_explain, method="I", sample_method="full")
+    shap_with_weights = rkhs_shap_with_weights.fit(
+        X_explain, method="I", sample_method="full"
+    )
+
+    np.testing.assert_allclose(
+        shap_baseline,
+        shap_with_weights,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="SHAP values differ when using krr_weights without mean_function",
+    )
+
 def test_exact_rkhs_shap_gpytorch_alpha(trained_model):
     """Test that alpha extracted from GPyTorch model produces near-identical SHAP values.
 
