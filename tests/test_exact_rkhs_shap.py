@@ -437,6 +437,7 @@ def test_exact_rkhs_shap_krr_weights_without_mean_function(trained_model):
         err_msg="SHAP values differ when using krr_weights without mean_function",
     )
 
+
 def test_exact_rkhs_shap_gpytorch_alpha(trained_model):
     """Test that alpha extracted from GPyTorch model produces near-identical SHAP values.
 
