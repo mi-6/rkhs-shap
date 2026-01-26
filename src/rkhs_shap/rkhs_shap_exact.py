@@ -65,7 +65,10 @@ class RKHSSHAP(RKHSSHAPBase):
                 is not required. Use this when you have already trained a GP model
                 and want to reuse the alpha weights. For GPyTorch models, alpha can
                 be extracted from model.prediction_strategy.mean_cache after making
-                a prediction.
+                a prediction. Important: If the GP was trained with a mean function,
+                you must also pass the same mean_function to RKHSSHAP to obtain
+                matching predictions, since GPyTorch computes alpha as
+                (K + σ²I)⁻¹(y - m(X)).
 
         Raises:
             ValueError: If neither noise_var nor krr_weights is provided.
