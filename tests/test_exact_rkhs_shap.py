@@ -543,6 +543,40 @@ def test_exact_rkhs_shap_gpytorch_alpha(trained_model):
     print("\nGPyTorch alpha test passed!")
 
 
+def test_exact_rkhs_shap_single_training_sample():
+    """Test that RKHSSHAP works with a single training sample (n=1).
+
+    This is an edge case where squeeze() without dimension argument would
+    convert a (1, 1) tensor to a 0D scalar, causing matmul to fail.
+    """
+    torch.manual_seed(42)
+
+    n_features = 3
+    X_train = torch.randn(1, n_features, dtype=torch.float64)
+    y_train = torch.randn(1, dtype=torch.float64)
+
+    kernel = gpytorch.kernels.RBFKernel(ard_num_dims=n_features)
+    kernel.lengthscale = torch.ones(1, n_features) * 1.0
+
+    rkhs_shap = RKHSSHAP(
+        X=X_train,
+        y=y_train,
+        kernel=kernel,
+        noise_var=0.1,
+    )
+
+    assert rkhs_shap._krr_weights.shape == (1, 1)
+    assert rkhs_shap._ypred.shape == (1,)
+    assert isinstance(rkhs_shap._reference, float)
+
+    shap_values = rkhs_shap.fit(X_train, method="I", sample_method="full")
+    assert shap_values.shape == (1, n_features)
+
+    pred_minus_ref = rkhs_shap._ypred[0].item() - rkhs_shap._reference
+    shap_sum = shap_values.sum()
+    np.testing.assert_allclose(shap_sum, pred_minus_ref, rtol=1e-6)
+
+
 def test_exact_rkhs_shap_reproducibility():
     """Test that exact RKHS-SHAP produces reproducible results with MC sampling."""
     np.random.seed(123)

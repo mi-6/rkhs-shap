@@ -99,7 +99,7 @@ class RKHSSHAP(RKHSSHAPBase):
             self._krr_weights = weights.reshape(-1, 1)
 
         # Predictions include mean function
-        self._ypred = K_train @ self._krr_weights.squeeze() + mean_train
+        self._ypred = K_train @ self._krr_weights.squeeze(1) + mean_train
         self._rmse = torch.sqrt(torch.mean((self._ypred - self._y) ** 2)).item()
         self._reference = self._ypred.mean().item()
 

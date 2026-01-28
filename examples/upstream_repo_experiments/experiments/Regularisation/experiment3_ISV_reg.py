@@ -14,10 +14,11 @@ warnings.filterwarnings("ignore")
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../")
 sys.path.append(base_dir)
 
+from rkhs_shap.kernel_ridge_regression import KernelRidgeRegressor  # noqa: E402
+
 from experiments.Regularisation.correlated_linear_model import (  # noqa: E402
     CorrelatedLinearModel,
 )
-from rkhs_shap.kernel_ridge_regression import KernelRidgeRegressor  # noqa: E402
 from rkhs_shap.rkhs_shap_approx import RKHSSHAPApprox  # noqa: E402
 from rkhs_shap.shapley_regulariser import ShapleyRegulariser  # noqa: E402
 
